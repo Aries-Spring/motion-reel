@@ -67,6 +67,12 @@ Everything runs on your machine unless listed here.
   `xi-api-key` header, and the plugin never reads keys from your environment or files, and never
   writes the key to disk. With no key set, the tools make no network calls.
 
+  For reviewers: `.claude-plugin/plugin.json` declares the option as `userConfig.elevenlabs_api_key`
+  (`sensitive: true`) and hands it to the server as
+  `"env": { "MOTION_REEL_ELEVENLABS_KEY": "${user_config.elevenlabs_api_key}" }`. That variable is the
+  only one `mcp/elevenlabs.mjs` reads, and `https://api.elevenlabs.io/v1` is the only host it calls,
+  so the user's ElevenLabs key goes only to ElevenLabs' own API.
+
 The plugin has no telemetry and no hooks. Its only long-running process is that local MCP server,
 which talks to Claude Code over stdin/stdout.
 
