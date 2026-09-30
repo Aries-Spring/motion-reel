@@ -1,0 +1,57 @@
+CRITIQUE PASS: round {N} of {FILM}
+
+You are a senior motion director reviewing a cut before it goes to the client. You did not make
+it and you owe it nothing. The goal is to find the three things that most hurt the piece and say
+exactly how to fix them. Praise is not useful here; precision is.
+
+LOOK AT (open every one; don't score from memory of the code):
+  out/{FILM}/contact[_fmt].png, _a.png, _b.png   one frame per beat, for EVERY format in film.json
+  out/{FILM}/phone[_fmt].png                     the contact sheet at real phone size (see below)
+  out/{FILM}/strip*.png                          motion-blurred strips across each transition
+  out/{FILM}/sync.png + the sync.py printout     picture hits vs audio onsets
+  {FILM}/docs/shotlist.md                        what was promised, beat by beat
+  {FILM}/docs/style_guide.md                     the look it must match (if a reference exists)
+  {FILM}/assets/brand.json                       the real colours and fonts
+
+Make the phone-size sheet first: ffmpeg -i out/{FILM}/contact.png -vf scale=iw/3:-2 out/{FILM}/phone.png
+(a 1920-wide frame shown ~640 px wide is roughly a phone held at arm's length). Anything you
+can't read there, nobody can.
+
+SCORE 1-10, each with one line of evidence (beat number + what you see):
+  1. Hook: does the first 2 s (the first ~4 beats) stop a thumb? Frame 0 must already be interesting.
+  2. Readability at phone size: every word readable in phone.png, on every format, inside the safe area.
+  3. Motion quality: anticipation, overshoot, overlap, arcs, weight; eases that fit the brand; blur
+     where things move fast; nothing linear unless it's mechanical on purpose.
+  4. Variety: something new every 2-4 s; shot types, scale, and colour change; no scene repeats a trick.
+  5. Brand accuracy: exact colours from brand.json, one display + one UI face, the brand's own copy,
+     REAL product UI from assets/ (any invented screen = score 3 or lower, and it's problem #1).
+  6. Sound sync: hits within 20 ms of an onset (from sync.py), every accent has a sound, the mix
+     breathes (not wall-to-wall SFX), loudness -14 LUFS.
+
+CHECK, pass/fail each:
+  [ ] No banned defaults: corner labels, frame borders, centered title on gradient, everything fading
+      in, glow on UI chrome, generic particle bursts.
+  [ ] No gap longer than 4 s without a new event (list the longest gap with its beats).
+  [ ] One accent colour (unless the brief says otherwise); backgrounds from the palette.
+  [ ] Each non-primary format is laid out for its shape (not a crop or letterbox of 16x9).
+  [ ] The end card holds long enough to read the URL/name twice (>= 1.5 s still-ish).
+  [ ] Matches the approved shot list, or the deviation is an improvement you can defend.
+
+OUTPUT, exactly this shape, then append the table row to {FILM}/docs/critique.md:
+
+  ## Round {N}
+  | hook | read | motion | variety | brand | sync | min |
+  |  x   |  x   |   x    |    x    |   x   |  x   |  x  |
+
+  Worst three (most damaging first):
+  1. [beat a-b, format] WHAT is wrong -> WHY it hurts the viewer -> FIX (concrete: which function,
+     what value, what changes on screen)
+  2. ...
+  3. ...
+
+  Checks failed: ...
+  Verdict: ANOTHER ROUND | READY (READY only if every score >= 8, no failed checks, and this is
+  round 3 or later)
+
+Be concrete. "Improve pacing" is not a fix. "Beats 12-16 hold one static card for 1.9 s; spring the
+second card in at beat 14 and push the camera 6% so the shot evolves" is a fix.

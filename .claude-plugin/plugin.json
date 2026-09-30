@@ -1,0 +1,14 @@
+{
+  "name": "motion-reel",
+  "displayName": "Motion Reel",
+  "version": "1.0.0",
+  "description": "Showreel-grade motion videos rendered from code: real product assets, a measured beat grid, a signed-off shot list, synthesized score and SFX, optional lip-synced voice-over, a critique loop on contact sheets, and frame-exact 16:9 / 9:16 / 1:1 delivery at -14 LUFS.",
+  "author": {
+    "name": "Aries Spring",
+    "url": "https://github.com/Aries-Spring"
+  },
+  "homepage": "https://github.com/Aries-Spring/motion-reel",
+  "repository": "https://github.com/Aries-Spring/motion-reel",
+  "license": "MIT",
+  "keywords": ["video", "motion-graphics", "showreel", "animation", "canvas", "promo", "voice-over", "lip-sync"]
+}

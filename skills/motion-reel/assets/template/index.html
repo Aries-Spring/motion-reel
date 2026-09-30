@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>__TITLE__</title>
+<style>
+  /* Two faces only: one display, one UI. Point these at the brand's files in fonts/. */
+  @font-face { font-family: Display; src: url(fonts/display.woff2) format('woff2'), url(fonts/display.ttf) format('truetype'); font-weight: 100 900; }
+  @font-face { font-family: UI; src: url(fonts/ui.woff2) format('woff2'), url(fonts/ui.ttf) format('truetype'); font-weight: 100 900; }
+  html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
+  body { display: grid; place-items: center; }
+  canvas { display: block; max-width: 100vw; max-height: 100vh; width: auto; height: auto; }
+  #hud { position: fixed; left: 12px; bottom: 10px; font: 12px/1 ui-monospace, monospace; color: #888; }
+  .render #hud { display: none; }
+</style>
+</head>
+<body>
+<canvas id="film"></canvas>
+<div id="hud">space: play/pause · ←/→: step · click: scrub · ?format=9x16 to preview other formats</div>
+<script type="module" src="film.js"></script>
+</body>
+</html>

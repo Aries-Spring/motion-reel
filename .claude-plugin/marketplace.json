@@ -1,0 +1,15 @@
+{
+  "name": "aries-spring",
+  "description": "Plugins by Aries Spring",
+  "owner": {
+    "name": "Aries Spring",
+    "url": "https://github.com/Aries-Spring"
+  },
+  "plugins": [
+    {
+      "name": "motion-reel",
+      "source": "./",
+      "description": "Showreel-grade motion videos rendered from code, with synthesized score, SFX and optional lip-synced voice-over"
+    }
+  ]
+}
