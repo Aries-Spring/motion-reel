@@ -1,7 +1,7 @@
 {
   "name": "motion-reel",
   "displayName": "Motion Reel",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Showreel-grade motion videos rendered from code: real product assets, a measured beat grid, a signed-off shot list, synthesized score and SFX, optional lip-synced voice-over, a critique loop on contact sheets, and frame-exact 16:9 / 9:16 / 1:1 delivery at -14 LUFS.",
   "author": {
     "name": "Aries Spring",
@@ -10,5 +10,23 @@
   "homepage": "https://github.com/Aries-Spring/motion-reel",
   "repository": "https://github.com/Aries-Spring/motion-reel",
   "license": "MIT",
-  "keywords": ["video", "motion-graphics", "showreel", "animation", "canvas", "promo", "voice-over", "lip-sync"]
+  "keywords": ["video", "motion-graphics", "showreel", "animation", "canvas", "promo", "voice-over", "lip-sync"],
+  "userConfig": {
+    "elevenlabs_api_key": {
+      "type": "string",
+      "title": "ElevenLabs API key",
+      "description": "Optional. Only for voice-over: used by the plugin's local ElevenLabs tools and sent only to api.elevenlabs.io. Leave empty to make videos without a voice.",
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "mcpServers": {
+    "elevenlabs": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/elevenlabs.mjs"],
+      "env": {
+        "MOTION_REEL_ELEVENLABS_KEY": "${user_config.elevenlabs_api_key}"
+      }
+    }
+  }
 }

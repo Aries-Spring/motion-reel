@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Motion Reel</title>
+  <rect width="256" height="256" rx="56" fill="#1A1A1A"/>
+  <g stroke="#FAF6EE" stroke-linecap="round" stroke-width="15">
+    <line x1="38" y1="94" x2="90" y2="94"/>
+    <line x1="58" y1="128" x2="98" y2="128"/>
+    <line x1="38" y1="162" x2="90" y2="162"/>
+  </g>
+  <path d="M128 78 L208 134 L128 190 Z" fill="#000000" opacity="0.55" stroke="#000000" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M120 70 L200 126 L120 182 Z" fill="#EF4F23" stroke="#EF4F23" stroke-width="18" stroke-linejoin="round"/>
+</svg>

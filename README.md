@@ -19,6 +19,11 @@ claude plugin install motion-reel@aries-spring
 
 Or inside a session: `/plugin install motion-reel --marketplace Aries-Spring/motion-reel`.
 
+For voice-over, set your ElevenLabs API key once: in Claude Code run
+`/plugin configure motion-reel@aries-spring` (or open `/plugin` > **Installed > motion-reel >
+Configure options**), paste it into **ElevenLabs API key**, then run `/reload-plugins`. The key is stored in your operating system's credential store. Leave it empty if
+you only want videos without a voice.
+
 Then just ask for a video: "make a 15 s promo for https://…", "a vertical reel about our app",
 "a showreel for my résumé about this product". The skill asks for anything missing (duration,
 formats, music, voice-over) in one round, then shows you a shot list before it builds anything.
@@ -30,7 +35,7 @@ This plugin drives real tools, so it is meant for Claude Code (or any agent with
 - Node 18 or later, and `ffmpeg` + `ffprobe` on the PATH (`brew install ffmpeg`)
 - [uv](https://docs.astral.sh/uv/) for the Python audio scripts, which declare their own dependencies
 - Playwright with Chromium in the project folder: `npm i -D playwright && npx playwright install chromium`
-- Optional, for voice-over: an ElevenLabs API key
+- Optional, for voice-over: an ElevenLabs API key, set as the plugin option above
 
 The scaffold step checks the toolchain and tells you what's missing.
 
@@ -52,13 +57,18 @@ Everything runs on your machine unless listed here.
 - **Package downloads.** `uv` installs the audio scripts' Python dependencies (librosa, numpy, scipy,
   soundfile, matplotlib) from PyPI on first run. Playwright and Chromium come from npm when you install
   them.
-- **ElevenLabs, only if you ask for a voice-over.** `voice.py` sends the script text to
-  `api.elevenlabs.io` for text-to-speech and forced alignment, and `scribe.py` sends audio you choose
-  (takes or the final mix) to ElevenLabs' speech-to-text to check intelligibility. The key is read from
-  the `ELEVENLABS_API_KEY` environment variable that you set for the session; it is sent only to
-  ElevenLabs and never written to disk by the plugin.
+- **ElevenLabs, only if you ask for a voice-over.** The plugin includes a small local MCP server,
+  `mcp/elevenlabs.mjs` (plain Node, no dependencies), that Claude Code starts with the plugin. Its
+  `tts` tool sends the script text to `api.elevenlabs.io` for text-to-speech and forced alignment,
+  and its `transcribe` tool sends audio files you choose (takes or the final mix) to ElevenLabs'
+  speech-to-text to check that every word is intelligible; `quota` and `voices` read your plan and
+  voice list. The only credential it uses is the **ElevenLabs API key** plugin option, which Claude
+  Code passes to that server from its credential store. The key goes only to ElevenLabs, in the
+  `xi-api-key` header, and the plugin never reads keys from your environment or files, and never
+  writes the key to disk. With no key set, the tools make no network calls.
 
-The plugin has no telemetry, hooks or background processes.
+The plugin has no telemetry and no hooks. Its only long-running process is that local MCP server,
+which talks to Claude Code over stdin/stdout.
 
 ## License
 

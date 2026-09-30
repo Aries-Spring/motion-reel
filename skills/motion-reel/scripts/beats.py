@@ -5,7 +5,7 @@
 """Music + beat grid for a film: measure a supplied track, or synthesize a bed. -> beats.json
 
     uv run <skill>/scripts/beats.py <film> --track song.mp3 [--start auto|SECONDS]
-    uv run <skill>/scripts/beats.py <film> --synth [--bpm auto|128] [--key D]
+    uv run <skill>/scripts/beats.py <film> --synth [--bpm auto|128] [--tonic D]
         [--mode major|minor|mixolydian|dorian] [--flavor house|tabla|lofi] [--drop BAR] [--seed N]
 
 Writes <film>/audio/music.wav (48 kHz stereo, peak -3 dBFS; mix.mjs masters later) and
@@ -56,14 +56,14 @@ def auto_bpm(duration, target=128, lo=112, hi=136):
     return best or float(target)
 
 
-def synth(film, duration, bpm, key, mode, flavor, drop_bar):
+def synth(film, duration, bpm, tonic, mode, flavor, drop_bar):
     beat = 60 / bpm
     n_beats = int(round(duration / beat))
     bars = n_beats // 4
     drop = min(drop_bar, max(bars - 2, 0)) * 4
     last = (bars - 1) * 4
     scale, prog = MODES[mode]
-    root = midi(f"{key}3")
+    root = midi(f"{tonic}3")
 
     drums, perc, bass, music = (Bus(duration, bpm) for _ in range(4))
     loop = [chord(root + scale[d], q) for d, q in prog]
@@ -86,7 +86,7 @@ def synth(film, duration, bpm, key, mode, flavor, drop_bar):
             theka = ["dha", "ge", "na", "ti", "na", "ka", "dhi", "na"]
             for k in (0, 1):
                 bl = theka[(b % 4) * 2 + k]
-                perc.add(bol(bl, glide=1.6 if bl == "dhi" else 1.0, sa=hz(f"{key}5")), b + 0.5 * k, 0.45 if k == 0 else 0.3, pan=-0.18)
+                perc.add(bol(bl, glide=1.6 if bl == "dhi" else 1.0, sa=hz(f"{tonic}5")), b + 0.5 * k, 0.45 if k == 0 else 0.3, pan=-0.18)
         # chord changes each bar
         if b % 4 == 0 and b < last:
             notes, broot = loop[bar % 4]
@@ -133,7 +133,7 @@ def synth(film, duration, bpm, key, mode, flavor, drop_bar):
     grid = measure_beats(grid_src.astype(np.float32), SR, bpm, n_beats=n_beats + 1)
     grid["sections"] = ([{"name": "intro", "beat": 0}] if drop else []) + \
         [{"name": "main", "beat": drop}, {"name": "end", "beat": last}]
-    grid["source"] = f"synth {flavor} {key} {mode} {bpm} bpm (beats.py), grid measured on the drum stem"
+    grid["source"] = f"synth {flavor} {tonic} {mode} {bpm} bpm (beats.py), grid measured on the drum stem"
     return mix, grid
 
 
@@ -183,7 +183,7 @@ def main():
     ap.add_argument("--start", default="auto")
     ap.add_argument("--synth", action="store_true")
     ap.add_argument("--bpm", default="auto")
-    ap.add_argument("--key", default="D")
+    ap.add_argument("--tonic", default="D", help="the musical key's tonic, e.g. D, F#, Bb")
     ap.add_argument("--mode", default="major", choices=MODES)
     ap.add_argument("--flavor", default="house", choices=["house", "tabla", "lofi"])
     ap.add_argument("--drop", type=int, default=None, help="bar the main section starts (0-based)")
@@ -191,7 +191,7 @@ def main():
     ap.add_argument("--seed", type=int, default=20260929)
     a = ap.parse_args()
     if bool(a.track) == bool(a.synth):
-        ap.error("pass exactly one of --track or --synth")
+        ap.error("use either --track or --synth")
 
     film = Path(a.film)
     cfg = json.loads((film / "film.json").read_text()) if (film / "film.json").exists() else {}
@@ -203,7 +203,7 @@ def main():
         bpm = auto_bpm(duration) if a.bpm == "auto" else float(a.bpm)
         bars = int(round(duration * bpm / 240))
         drop = a.drop if a.drop is not None else (1 if bars <= 6 else 2 if bars <= 10 else 4)
-        mix, grid = synth(film, duration, bpm, a.key, a.mode, a.flavor, drop)
+        mix, grid = synth(film, duration, bpm, a.tonic, a.mode, a.flavor, drop)
     else:
         mix, grid = track(film, a.track, duration, a.start)
 

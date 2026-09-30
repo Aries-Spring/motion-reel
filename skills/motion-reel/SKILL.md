@@ -1,7 +1,7 @@
 ---
 name: motion-reel
 description: Make a product or showreel motion video rendered from code (canvas film that is a pure function of time, synthesized score + SFX, frame-exact render). Use whenever the user asks for a launch video, showreel, product reel, promo, animated explainer, motion ad, social cut (9:16, 1:1) or "a video about" some product or URL, even if they never say "motion graphics". Covers gathering real assets from the product URL, a style guide from a reference, the beat grid, a shot list the user signs off, the build, a critique loop on contact sheets, render, SFX, voice-over with a lip-synced talking character, -14 LUFS mix and multi-format delivery.
-compatibility: Claude Code or any agent with a shell. Needs node 18+, ffmpeg + ffprobe, uv (Python deps install themselves on first run), and Playwright + Chromium in the project folder. Voice-over needs an ElevenLabs API key.
+compatibility: Claude Code or any agent with a shell. Needs node 18+, ffmpeg + ffprobe, uv (Python deps install themselves on first run), and Playwright + Chromium in the project folder. Voice-over uses the plugin's ElevenLabs tools and an API key set as a plugin option.
 ---
 
 # Motion reel
@@ -60,7 +60,7 @@ no VO). Brand colors and fonts come from the site in step 1, so ask only whether
 3. **Music and the beat grid.** Use one of:
    - `uv run <skill>/scripts/beats.py <film> --track song.mp3`: measures the supplied track and cuts
      the loudest window that fits, starting on a downbeat.
-   - `uv run <skill>/scripts/beats.py <film> --synth --flavor house|tabla|lofi --mode ... --key ...`:
+   - `uv run <skill>/scripts/beats.py <film> --synth --flavor house|tabla|lofi --mode ... --tonic ...`:
      synthesizes a bed.
 
    Either way you get `audio/music.wav` and `beats.json` (grid, sections, energy per bar).
