@@ -1,8 +1,13 @@
 # Voice-over (optional)
 
-Only when the brief has a voice (narrator, talking character). Tools and worked examples:
-- The plugin's `elevenlabs` MCP tools: `quota`, `voices`, `tts` (cached takes + forced alignment) and
-  `transcribe` (Scribe). In Claude Code they appear as `mcp__plugin_motion-reel_elevenlabs__<tool>`.
+Only when the brief has a voice (narrator, talking character); a reel without one is the default and
+needs none of this. There are two sources of a voice:
+- **A recording the user supplies**: no account needed. See "A supplied recording" below.
+- **ElevenLabs**, through the optional `motion-reel-voice` plugin's MCP tools: `quota`, `voices`, `tts`
+  (cached takes + forced alignment) and `transcribe` (Scribe). In Claude Code they appear as
+  `mcp__plugin_motion-reel-voice_elevenlabs__<tool>`.
+
+Worked examples (for either source):
 - `references/examples/score_vo.py`: `build_vo()`, the beat-locked edit and the `lipsync.json` export,
   inside a full bespoke score (copy it to `<film>/audio/score.py` and adapt).
 - `references/examples/rig_split.py` + `lipsync_rig.js`: turning a flat illustrated portrait into a
@@ -17,14 +22,26 @@ Only when the brief has a voice (narrator, talking character). Tools and worked 
 - Prefer words the chosen voice can say: e.g. a non-native voice flattens retroflex consonants, so
   pick synonyms that avoid them in key words.
 
-## ElevenLabs
-- The key is the plugin option **ElevenLabs API key**, which the user sets once with
-  `/plugin configure motion-reel` (then `/reload-plugins`); it lives in the OS credential
+## A supplied recording
+Ask for a clean, dry take (wav or mp3, no music) and put it in `<film>/audio/vo/`. Everything below
+still applies except the forced alignment, which only the ElevenLabs tools provide:
+- Cut phrases at silences in the recording's own RMS envelope (-35 dB with a 150 ms minimum gap is a
+  good start) instead of at aligned word boundaries, then land each phrase onset on a beat as usual.
+- Lip sync from the processed VO's 100 Hz envelope alone: export `lipsync.json` with an empty
+  `visemes` list; `lipsync_rig.js` then opens the mouth by loudness with a neutral width, which reads
+  well at video speed.
+- Time supers per phrase (from the placed phrase onsets) rather than per word.
+If the user also has the `motion-reel-voice` tools, `transcribe` works on any recording as a check.
+
+## ElevenLabs (motion-reel-voice add-on)
+- If the `mcp__plugin_motion-reel-voice_elevenlabs__*` tools aren't available, the add-on isn't
+  installed: `claude plugin install motion-reel-voice@aries-spring`. Otherwise use a supplied
+  recording or skip the voice.
+- The key is that plugin's option **ElevenLabs API key**, which the user sets once with
+  `/plugin configure motion-reel-voice` (then `/reload-plugins`); it lives in the OS credential
   store and only the local MCP server sees it. If a tool says no key is set, ask the user to set it
   there. Never ask for the key in chat or write it anywhere; if they paste one anyway, point them to
   the option and suggest rotating it.
-- If the `elevenlabs` tools aren't available at all (the skill was installed on its own, without the
-  plugin), say voice-over needs the plugin and offer the film with kinetic type instead.
 - Check the plan first (`quota`, `voices`): free-tier keys can only use
   **premade** voices through the API (library voices return 402, voice design 403) and run at most 2
   requests at once. Budget characters: each take of a 15-20 s script costs ~200-250.
@@ -51,5 +68,6 @@ envelope from the processed VO. In the film, blend visemes over +/-40 ms (coarti
 mouth height by the envelope.
 
 ## Verify
-Transcribe the final mix with `transcribe` (export an mp3 of `mix.wav` first): every word, and the brand name, must come back right with the
+With the ElevenLabs tools, transcribe the final mix with `transcribe` (export an mp3 of `mix.wav`
+first); without them, listen-check by rendering the phrase list against the mix. Every word, and the brand name, must come back right with the
 music under it. If not, deepen the ducking or lift the VO before touching anything else.

@@ -9,7 +9,15 @@
     {
       "name": "motion-reel",
       "source": "./",
-      "description": "Showreel-grade motion videos rendered from code, with synthesized score, SFX and optional lip-synced voice-over"
+      "description": "Showreel-grade motion videos rendered from code, with synthesized score and SFX. No API keys needed."
+    },
+    {
+      "name": "motion-reel-voice",
+      "source": {
+        "source": "github",
+        "repo": "Aries-Spring/motion-reel-voice"
+      },
+      "description": "Optional voice-over add-on for Motion Reel: ElevenLabs takes, forced alignment for lip sync, transcription checks"
     }
   ]
 }

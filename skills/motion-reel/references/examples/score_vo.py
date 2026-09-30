@@ -7,7 +7,7 @@ Copy to <film>/audio/score.py and rewrite TAKE, PHRASES, the harmony and the arr
 
     uv run <film>/audio/score.py
 
-What it shows: build_vo() cuts a force-aligned take (the plugin's tts tool) into phrases and lands each
+What it shows: build_vo() cuts a force-aligned take (motion-reel-voice's tts tool) into phrases and lands each
 phrase's speech onset on a beat, prints the gaps (fix any OVERLAP by moving a phrase), maps the
 language's letters to visemes (here Urdu), and exports lipsync.json (100 Hz mouth envelope from the
 processed VO + viseme segments + words + phrases, all in film time). main() writes music.wav and

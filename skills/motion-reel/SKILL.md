@@ -1,7 +1,7 @@
 ---
 name: motion-reel
 description: Make a product or showreel motion video rendered from code (canvas film that is a pure function of time, synthesized score + SFX, frame-exact render). Use whenever the user asks for a launch video, showreel, product reel, promo, animated explainer, motion ad, social cut (9:16, 1:1) or "a video about" some product or URL, even if they never say "motion graphics". Covers gathering real assets from the product URL, a style guide from a reference, the beat grid, a shot list the user signs off, the build, a critique loop on contact sheets, render, SFX, voice-over with a lip-synced talking character, -14 LUFS mix and multi-format delivery.
-compatibility: Claude Code or any agent with a shell. Needs node 18+, ffmpeg + ffprobe, uv (Python deps install themselves on first run), and Playwright + Chromium in the project folder. Voice-over uses the plugin's ElevenLabs tools and an API key set as a plugin option.
+compatibility: Claude Code or any agent with a shell. Needs node 18+, ffmpeg + ffprobe, uv (Python deps install themselves on first run), and Playwright + Chromium in the project folder. No accounts or API keys. Optional voice-over from the user's own recording, or ElevenLabs via the motion-reel-voice add-on.
 ---
 
 # Motion reel
@@ -34,10 +34,19 @@ own dependencies inline, so `uv run <skill>/scripts/<script>.py` works in any fo
 ## Inputs to collect first
 
 Product + URL, duration, formats (9:16 / 1:1 / 16:9), brand colors + fonts, a reference (frame,
-video or image folder), music (file or "synthesize"). Also ask whether there is a voice-over.
+video or image folder), music (file or "synthesize"), and whether there is a voice-over.
 
 Ask for everything missing in one AskUserQuestion round and offer defaults (15 s, 16:9, synthesize,
 no VO). Brand colors and fonts come from the site in step 1, so ask only whether to override them.
+
+**Voice-over is optional, and no VO is the default.** Most reels don't need one: kinetic type,
+music and SFX carry the message, and the whole pipeline runs with no accounts or keys. Offer a voice
+only when the brief calls for one (a narrator, a talking character). Then there are two sources, and
+`references/voiceover.md` covers both:
+- **A recording the user supplies** (any language, any voice), placed and lip-synced from its audio.
+- **ElevenLabs**, if its tools are available (`mcp__plugin_motion-reel-voice_elevenlabs__*`, from the
+  optional `motion-reel-voice` plugin). If they aren't and the user wants a generated voice, tell them
+  about that add-on; never ask for an API key in chat, and carry on without a voice if they'd rather.
 
 ## Pipeline
 
@@ -68,7 +77,8 @@ no VO). Brand colors and fonts come from the site in step 1, so ask only whether
      (instruments, Bus, measure_beats; `references/examples/score_vo.py` is a full example with a
      beat-locked voice-over). It must still write `music.wav` + `beats.json`. Run it as
      `MOTION_REEL_SKILL=<skill> uv run <film>/audio/score.py` so it finds `dsp.py`.
-   - For a voice-over, read `references/voiceover.md` now: the VO edit is placed on this grid.
+   - Only if there is a voice-over: read `references/voiceover.md` now, since the VO edit is placed
+     on this grid. Without one, skip it; `mix.mjs` masters music + SFX alone.
 
 4. **Shot list, then stop.** Write `docs/shotlist.md` on the beat grid using `references/shotlist.md`
    (one row per shot: beats, asset used, motion, transition, sounds, per-format notes). Show it and
