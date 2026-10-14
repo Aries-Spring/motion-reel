@@ -1,6 +1,6 @@
 ---
 name: motion-reel
-description: Make a product or showreel motion video rendered from code (canvas film that is a pure function of time, synthesized score + SFX, frame-exact render). Use whenever the user asks for a launch video, showreel, product reel, promo, animated explainer, motion ad, social cut (9:16, 1:1) or "a video about" some product or URL, even if they never say "motion graphics". Covers gathering real assets from the product URL, a style guide from a reference, the beat grid, a shot list the user signs off, the build, a critique loop on contact sheets, render, SFX, voice-over with a lip-synced talking character, -14 LUFS mix and multi-format delivery.
+description: Make a product or showreel motion video rendered from code (canvas film that is a pure function of time, 2-D and three.js 3-D, synthesized score + SFX, frame-exact render). Use whenever the user asks for a launch video, showreel, product reel, promo, animated explainer, motion ad, social cut (9:16, 1:1), music video or lyric video for a song they supply, or "a video about" some product or URL, even if they never say "motion graphics". Covers gathering real assets from the product URL, a style guide from a reference, the beat grid, lyric transcription and word alignment, a shot list the user signs off, the build, a critique loop on contact sheets, GPU render, SFX, voice-over or a singer lip-synced to the vocal, -14 LUFS mix and multi-format delivery.
 compatibility: Claude Code or any agent with a shell. Needs node 18+, ffmpeg + ffprobe, uv (Python deps install themselves on first run), and Playwright + Chromium in the project folder. No accounts or API keys. Optional voice-over from the user's own recording, or ElevenLabs via the motion-reel-voice add-on.
 ---
 
@@ -15,11 +15,13 @@ the end apply throughout; if the project's own CLAUDE.md sets different rules, t
 ```
 <film>/film.json        title, duration, formats (first = primary), poster time
 <film>/index.html       fonts + canvas;  film.js  the film;  lib/motion.js  harness + springs
+<film>/lib/gl.js, sets/ three.js sets composited into the film (scaffold --3d; references/3d.md)
 <film>/assets/          real screenshots, logo, fonts, brand.json, copy.md (gather.mjs)
-<film>/docs/            style_guide.md, shotlist.md, critique.md, reference/
-<film>/audio/           music.wav, sfx.wav, vo.wav (optional), mix.wav
+<film>/docs/            style_guide.md, shotlist.md, critique.md, reference/, lyrics.txt (music videos)
+<film>/audio/           music.wav, sfx.wav, vo.wav (optional), mix.wav, stems/ (vocal separation)
 <film>/beats.json       the measured grid everything is timed against
-out/<film>/             contact sheets, strips, hits.json, video_<fmt>.mp4, final*.mp4, poster.png
+<film>/lyrics.json      word-aligned lyrics + lipsync.json (music videos; align.py)
+out/<film>/             contact sheets + phone sheets, strips, hits.json, video_<fmt>.mp4, final*.mp4, poster.png
 ```
 
 Never overwrite another film's directory; start new work with `scaffold.mjs`.
@@ -35,6 +37,11 @@ own dependencies inline, so `uv run <skill>/scripts/<script>.py` works in any fo
 
 Product + URL, duration, formats (9:16 / 1:1 / 16:9), brand colors + fonts, a reference (frame,
 video or image folder), music (file or "synthesize"), and whether there is a voice-over.
+
+**A song the user supplies can be the whole film** (a music or lyric video): the track is the
+soundtrack and the clock, the film runs its full length, every lyric lands on its sung word, and a
+singer can lip-sync to the vocal. Read `references/lyrics.md` before the grid step. There is no
+product URL then: the "brand" is the song's world (palette, two faces, a character) agreed with the user.
 
 Ask for everything missing in one AskUserQuestion round and offer defaults (15 s, 16:9, synthesize,
 no VO). Brand colors and fonts come from the site in step 1, so ask only whether to override them.
@@ -69,6 +76,9 @@ only when the brief calls for one (a narrator, a talking character). Then there 
 3. **Music and the beat grid.** Use one of:
    - `uv run <skill>/scripts/beats.py <film> --track song.mp3`: measures the supplied track and cuts
      the loudest window that fits, starting on a downbeat.
+   - `uv run <skill>/scripts/beats.py <film> --track song.mp3 --full`: the whole song (music/lyric
+     videos); film.json's duration becomes the track's. Then `lyrics.py` and `align.py` for the words
+     (`references/lyrics.md`). It prints how it picked the downbeat; `--downbeat SECONDS` overrides.
    - `uv run <skill>/scripts/beats.py <film> --synth --flavor house|tabla|lofi --mode ... --tonic ...`:
      synthesizes a bed.
 
@@ -82,7 +92,9 @@ only when the brief calls for one (a narrator, a talking character). Then there 
 
 4. **Shot list, then stop.** Write `docs/shotlist.md` on the beat grid using `references/shotlist.md`
    (one row per shot: beats, asset used, motion, transition, sounds, per-format notes). Show it and
-   wait for the user's OK. Changing a table is cheap and re-animating a scene is not.
+   wait for the user's OK. Changing a table is cheap and re-animating a scene is not. If the film has a
+   character, show a model sheet (poses and expressions) with it: the character is the thing the user
+   most wants to approve before it moves.
 
 5. **Build `film.js`.** Start from the scaffolded template.
    - Import `lib/motion.js` and time everything in beats (`u`).
@@ -91,13 +103,23 @@ only when the brief calls for one (a narrator, a talking character). Then there 
    - For layout, use `FORMAT.pick({...})` and `FORMAT.safe` so each format is composed for its own
      shape.
    - `layout` / `glyph` handle per-glyph type, and `cover` / `crop` place the real screenshots.
+   - **3-D** (a camera through a space, lit objects, instanced crowds, shaders): scaffold with `--3d`,
+     `npm i three opentype.js`, build sets with `lib/gl.js` and read `references/3d.md` first.
+   - **A character drawn in code**: `references/examples/vector_rig.js` (2.5-D head, hair locks, eyes,
+     visemes) and `performance.js` (lip sync, blinks, follow-through). A raster portrait: the cut-out
+     rig in `references/voiceover.md`.
+   - `post(ctx, u, t)` in `M.film()` runs after the motion-blur accumulation: grain and glitch go
+     there, or the sub-frame average erases them. `samples` can be a function of t.
    - List every accent in `HITS` as `[beat, label, sfx, opts]`. `sfx.mjs` voices them, so sound
      can't drift from picture (`node <skill>/scripts/sfx.mjs --list` shows the palette).
    - Follow the studio rules below throughout.
 
 6. **Critique loop: 3 rounds minimum.** Each round:
-   - Run `node <skill>/scripts/render.mjs --film <film> --contact [--format f]` for every format.
-   - Run `--strip a:b:8` across each transition, plus `--at` for detail.
+   - Run `node <skill>/scripts/render.mjs --film <film> --contact [--format f]` for every format
+     (long films: `--every 2`, or `--from/--to` for a section). Look at the `contact_pN.png` pages and
+     the half-size `phone_pN.png` pages (a phone at arm's length).
+   - Run `--strip a:b:8 --name <cut>` across each transition, plus `--at` for detail, and
+     `--range a:b` for a short video of a section when motion can't be judged from stills.
    - Run `node <skill>/scripts/sfx.mjs <film> && node <skill>/scripts/mix.mjs <film> --no-mux`,
      then `node <skill>/scripts/render.mjs --film <film> --hits && uv run <skill>/scripts/sync.py <film>`.
    - Run the review in `prompts/critique-pass.txt`: score, find the worst three, append the round
@@ -106,6 +128,8 @@ only when the brief calls for one (a narrator, a talking character). Then there 
 
 7. **Render and deliver the audio.** Run each step in order:
    - `node <skill>/scripts/render.mjs --film <film> --format <f> --video-only` for each format in film.json.
+     Frames stream straight into the encoder (no disk wall on long films). On macOS WebGL runs on the
+     GPU; the renderer prints which ("SwiftShader" = software, ~80x slower for 3-D).
    - `node <skill>/scripts/sfx.mjs <film>`
    - `node <skill>/scripts/mix.mjs <film>`. This masters to -14 LUFS / -1 dBTP and muxes
      `out/<film>/final.mp4` (primary format) plus `final_<fmt>.mp4` for the others.
@@ -134,6 +158,16 @@ If a shot needs a screen that doesn't exist, change the shot.
 borders, glow on UI chrome, generic particle bursts. They are the signature of template video;
 entrances need direction, weight and a reason. One display face, one UI face. One accent colour
 unless the brief says otherwise. Something new happens on screen every 2 to 4 seconds.
+
+**Cuts.** The frame on the downbeat is the hit: a cut's first frame shows the new image, never a blank
+or a full-frame flash. Budget full flashes to one or two structural moments (the drop, the end card);
+a flash on every cut reads as template video. A whip is a pan with both shots on screen (A slides out
+as B slides in), never two half-moves with empty frames between. Zooms run in log space
+(`s = a * (b / a) ** p`), which reads as a constant-rate dolly; a linear scale lerp lingers big.
+
+**Type.** Every word the viewer must read survives the phone sheets. Before using any character
+outside basic Latin (CJK, arrows, check marks, superscripts), check both faces contain it (opentype.js
+`charToGlyphIndex`): a fallback glyph breaks the two-face rule and looks broken.
 
 **Sound.** Score and SFX are synthesized in code unless a track is supplied. Hits sit on the measured
 beat grid (`beats.json`). Master to -14 LUFS integrated, -1 dBTP (`mix.mjs`).

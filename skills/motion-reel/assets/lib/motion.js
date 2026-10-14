@@ -233,7 +233,11 @@ export const TS = (u) => GRID.offset + u * GRID.period;   // beats -> seconds
 
 // ------------------------------------------------------------------ harness
 
-export async function film({ draw, init, fonts = [], images = {}, hits = [], samples = 16, shutter = 0.5 }) {
+// post(ctx, u, t, IMG) runs once per frame AFTER the motion-blur accumulation: grain, glitch and
+// anything else that must not be averaged away by the sub-frame samples.
+// samples may be a number or a function of t (fewer sub-frames where nothing moves fast or a shot
+// is expensive, e.g. a raymarched 3-D scene).
+export async function film({ draw, init, post, fonts = [], images = {}, hits = [], samples = 16, shutter = 0.5 }) {
   const canvas = document.getElementById('film');
   canvas.width = W; canvas.height = H;
   if (RENDER) document.body.classList.add('render');
@@ -270,15 +274,23 @@ export async function film({ draw, init, fonts = [], images = {}, hits = [], sam
 
   // Each frame samples from half a frame after its timestamp: the frame nearest a beat is the
   // first frame of that beat's hit, and the forward shutter never smears a cut back a shot.
+  const runPost = (t0) => {
+    if (!post) return;
+    mctx.save(); mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.globalAlpha = 1;
+    post(mctx, U(t0), t0, IMG);
+    mctx.restore();
+  };
   window.seek = (t) => {
     const t0 = t + 0.5 / fps;
-    if (!blur) { frame(mctx, t0); return; }
-    for (let k = 0; k < samples; k++) {
-      frame(bctx, t0 + (k / samples) * (shutter / fps));
+    const n = typeof samples === 'function' ? samples(t0) : samples;
+    if (!blur || n <= 1) { frame(mctx, t0); runPost(t0); return; }
+    for (let k = 0; k < n; k++) {
+      frame(bctx, t0 + (k / n) * (shutter / fps));
       mctx.globalAlpha = 1 / (k + 1);
       mctx.drawImage(buf, 0, 0);
     }
     mctx.globalAlpha = 1;
+    runPost(t0);
   };
   window.HITS = hits;
   window.DURATION = Number(cfg.duration || 15);

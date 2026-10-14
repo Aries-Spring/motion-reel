@@ -5,6 +5,7 @@
 """Music + beat grid for a film: measure a supplied track, or synthesize a bed. -> beats.json
 
     uv run <skill>/scripts/beats.py <film> --track song.mp3 [--start auto|SECONDS]
+    uv run <skill>/scripts/beats.py <film> --track song.mp3 --full      (music / lyric video: the whole song)
     uv run <skill>/scripts/beats.py <film> --synth [--bpm auto|128] [--tonic D]
         [--mode major|minor|mixolydian|dorian] [--flavor house|tabla|lofi] [--drop BAR] [--seed N]
 
@@ -14,6 +15,10 @@ The film reads the grid; the shot list is written against it. Duration comes fro
 
 --track: the excerpt starts on a downbeat (auto = the loudest window that fits), is cut hard on
          the downbeat and faded over the last 0.5 s. The grid is measured, never assumed.
+--full:  keep the whole track, untouched; film.json's duration is set to the track's length. Beat 0
+         is the first downbeat; any pickup before it has negative beats (still listed in "beats").
+--downbeat SECONDS: the time of any bar's first beat, when the detected downbeat is a beat off
+         (detection: harmonic change into the beat, then the kick; both scores are printed).
 --synth: bpm auto picks the tempo nearest 128 that makes the duration whole bars. Sections:
          intro (bars before --drop), main, end (last bar: the resolve under the end card).
 """
@@ -137,20 +142,38 @@ def synth(film, duration, bpm, tonic, mode, flavor, drop_bar):
     return mix, grid
 
 
-def track(film, path, duration, start):
+def track(film, path, duration, start, whole=False, downbeat=None):
     y, sr = librosa.load(path, sr=SR, mono=False)
     if y.ndim == 1:
         y = np.stack([y, y])
     mono = y.mean(axis=0)
     full = measure_beats(mono, SR, 120)
     period, offset = full["period"], full["offset"]
-    # downbeat phase: which of the 4 beat positions carries the most low-end attack (the kick on 1)
-    low = librosa.onset.onset_strength(y=dsp.filt(mono, "lowpass", 150), sr=SR, hop_length=512)
-    lt = librosa.times_like(low, sr=SR, hop_length=512)
+    # downbeat phase: harmonic change + the kick (dsp.downbeat_phase), or the user's --downbeat
     bts = np.array(full["beats"])
-    at = np.interp(bts, lt, low)
-    phase = int(np.argmax([at[p::4].mean() for p in range(4)]))
+    if downbeat is not None:
+        phase = int(np.argmin(np.abs(bts - downbeat))) % 4
+        print(f"downbeat: from --downbeat {downbeat:.3f} s")
+    else:
+        phase, why = dsp.downbeat_phase(mono, SR, bts)
+        print(f"downbeat phase {phase}: chroma change {why['chroma']}, kick {why['kick']} -> score {why['score']}"
+              " (override with --downbeat SECONDS if the bars look shifted)")
     downs = bts[phase::4]
+    if whole:
+        # the whole song: beat 0 on the first downbeat, the pickup before it in negative beats
+        dur = len(mono) / SR
+        offset = float(downs[0])
+        n0 = int(np.ceil(offset / period))
+        cut = y.copy()
+        fo = int(0.02 * SR)
+        cut[:, -fo:] *= np.linspace(1, 0, fo)
+        cut *= 10 ** (-1 / 20) / (np.abs(cut).max() + 1e-9)
+        grid = dict(full)
+        grid["offset"] = round(offset, 5)
+        grid["beats"] = [round(offset + period * i, 5) for i in range(-n0, int((dur - offset) / period) + 1) if offset + period * i >= 0]
+        grid["sections"] = []
+        grid["source"] = f"{Path(path).name}, whole track ({dur:.2f} s), grid measured over the full song"
+        return cut, grid, dur
     fits = downs[downs + duration <= len(mono) / SR]
     if not len(fits):
         raise SystemExit(f"track is shorter than {duration}s")
@@ -173,7 +196,7 @@ def track(film, path, duration, start):
     grid["beats"] = [round(grid["offset"] + grid["period"] * i, 5) for i in range(n)]
     grid["sections"] = []
     grid["source"] = f"{Path(path).name} from {t0:.3f}s (downbeat), grid measured in the excerpt"
-    return cut, grid
+    return cut, grid, duration
 
 
 def main():
@@ -181,6 +204,8 @@ def main():
     ap.add_argument("film")
     ap.add_argument("--track")
     ap.add_argument("--start", default="auto")
+    ap.add_argument("--full", action="store_true", help="keep the whole track (music/lyric videos)")
+    ap.add_argument("--downbeat", type=float, default=None, help="time (s) of any bar's first beat, if detection picks the wrong one")
     ap.add_argument("--synth", action="store_true")
     ap.add_argument("--bpm", default="auto")
     ap.add_argument("--tonic", default="D", help="the musical key's tonic, e.g. D, F#, Bb")
@@ -205,15 +230,21 @@ def main():
         drop = a.drop if a.drop is not None else (1 if bars <= 6 else 2 if bars <= 10 else 4)
         mix, grid = synth(film, duration, bpm, a.tonic, a.mode, a.flavor, drop)
     else:
-        mix, grid = track(film, a.track, duration, a.start)
+        mix, grid, duration = track(film, a.track, duration, a.start, whole=a.full, downbeat=a.downbeat)
+        if a.full:
+            cfg["duration"] = round(duration, 3)
+            (film / "film.json").write_text(json.dumps(cfg, indent=1) + "\n")
+            print(f"film.json duration -> {cfg['duration']} s (the whole track)")
 
     grid["beats"] = [b for b in grid["beats"] if b < duration + 0.5]
-    grid["downbeats"] = grid["beats"][::4]
+    # downbeats by grid index (beat 0 is a downbeat; a pickup can sit at negative beats)
+    grid["downbeats"] = [b for b in grid["beats"] if round((b - grid["offset"]) / grid["period"]) % 4 == 0]
     # energy per bar: where the track lifts, for the shot list
     mono = mix.mean(axis=0)
     bar_s = grid["period"] * 4
-    grid["bar_energy"] = [round(float(np.sqrt(np.mean(mono[int((grid["offset"] + i * bar_s) * SR):int((grid["offset"] + (i + 1) * bar_s) * SR)] ** 2) + 1e-12)), 4)
-                          for i in range(int(duration / bar_s))]
+    o = max(0.0, grid["offset"])
+    grid["bar_energy"] = [round(float(np.sqrt(np.mean(mono[int((o + i * bar_s) * SR):int((o + (i + 1) * bar_s) * SR)] ** 2) + 1e-12)), 4)
+                          for i in range(int((duration - o) / bar_s))]
     grid["duration"] = duration
     sf.write(film / "audio" / "music.wav", mix.T, SR, subtype="PCM_24")
     (film / "beats.json").write_text(json.dumps(grid, indent=1))

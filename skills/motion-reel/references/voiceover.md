@@ -12,6 +12,9 @@ Worked examples (for either source):
   inside a full bespoke score (copy it to `<film>/audio/score.py` and adapt).
 - `references/examples/rig_split.py` + `lipsync_rig.js`: turning a flat illustrated portrait into a
   talking cut-out (clean plate, feature layer, jaw warp, vector mouth).
+- `references/examples/vector_rig.js` + `performance.js`: a character drawn entirely in code with a
+  2.5-D head (turns, blinks, expressions, visemes) and a performance driven by lipsync.json; built for a
+  singer (references/lyrics.md) but the same rig talks to a VO.
 
 ## Script
 - Budget ~2.5 words/s for a clear read, ~3 for an energetic one, and leave the first beat and the
