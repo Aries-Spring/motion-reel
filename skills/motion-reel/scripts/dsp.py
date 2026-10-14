@@ -366,8 +366,15 @@ def measure_beats(y, sr, bpm_hint, n_beats=None, t0=0.0):
         snapped.append(float(near[np.argmin(np.abs(near - bt))]) if len(near) else float(bt))
     snapped = np.array(snapped)
     period0 = float(np.median(np.diff(snapped)))
-    k = np.round((snapped - snapped[0]) / period0) + np.round(snapped[0] / period0)
-    keep = np.ones(len(k), bool)
+    # The period that makes every tracked beat phase-coherent: |mean(exp(2 pi i t / p))| peaks at the
+    # true period. Unlike numbering beats by rounding, it doesn't slip an index over a long track and
+    # shrugs off the beats the tracker drops or doubles. Then least squares on the inliers.
+    cand = np.linspace(period0 * 0.97, period0 * 1.03, 6001)
+    R = np.abs(np.exp(2j * np.pi * snapped[None, :] / cand[:, None]).mean(axis=1))
+    period = float(cand[np.argmax(R)])
+    offset = float(np.angle(np.exp(2j * np.pi * snapped / period).mean()) / (2 * np.pi) * period)
+    k = np.round((snapped - offset) / period)
+    keep = np.abs(snapped - (offset + period * k)) < 0.25 * period
     for _ in range(4):
         A = np.stack([np.ones_like(k[keep]), k[keep]], axis=1)
         (offset, period), *_ = np.linalg.lstsq(A, snapped[keep], rcond=None)
@@ -385,6 +392,29 @@ def measure_beats(y, sr, bpm_hint, n_beats=None, t0=0.0):
         "beats": beats, "detected": [round(x - t0, 4) for x in snapped.tolist()],
         "fit_inliers": int(keep.sum()), "fit_residual_ms": round(float(np.sqrt(np.mean(resid ** 2))) * 1000, 2),
     }
+
+
+def downbeat_phase(y, sr, beats):
+    """Which of every 4 beats is the 1. Two cues, z-scored over the 4 phases and summed:
+    harmonic change entering the beat (chords move on the bar line; weight 1) and low-band attack
+    (the kick; weight 0.5). The kick alone is ambiguous when it lands on every other beat.
+    Returns (phase, {"chroma": [...], "kick": [...], "score": [...]})."""
+    bts = np.asarray(beats)
+    y22 = librosa.resample(np.asarray(y, dtype=np.float32), orig_sr=sr, target_sr=22050)
+    ch = librosa.feature.chroma_cqt(y=y22, sr=22050, hop_length=512)
+    ct = librosa.times_like(ch, sr=22050, hop_length=512)
+    B = np.array([ch[:, (ct >= a) & (ct < b)].mean(axis=1) if np.any((ct >= a) & (ct < b)) else np.zeros(12)
+                  for a, b in zip(bts[:-1], bts[1:])])
+    B /= np.linalg.norm(B, axis=1, keepdims=True) + 1e-9
+    flux = np.concatenate([[0.0], 1 - np.sum(B[1:] * B[:-1], axis=1), [0.0]])[: len(bts)]
+    low = librosa.onset.onset_strength(y=filt(y22, "lowpass", 150), sr=22050, hop_length=128)
+    lt = librosa.times_like(low, sr=22050, hop_length=128)
+    kick = np.interp(bts, lt, low)
+    c = np.array([np.median(flux[p::4]) for p in range(4)])
+    k = np.array([kick[p::4].mean() for p in range(4)])
+    z = lambda v: (v - v.mean()) / (v.std() + 1e-9)
+    score = z(c) + 0.5 * z(k)
+    return int(np.argmax(score)), {"chroma": np.round(c, 4).tolist(), "kick": np.round(k, 4).tolist(), "score": np.round(score, 2).tolist()}
 
 
 def ebur128(path):

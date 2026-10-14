@@ -1,8 +1,8 @@
 {
   "name": "motion-reel",
   "displayName": "Motion Reel",
-  "version": "1.2.0",
-  "description": "Showreel-grade motion videos rendered from code: real product assets, a measured beat grid, a signed-off shot list, synthesized score and SFX, a critique loop on contact sheets, and frame-exact 16:9 / 9:16 / 1:1 delivery at -14 LUFS. No accounts or API keys needed; add motion-reel-voice for ElevenLabs voice-over.",
+  "version": "1.3.0",
+  "description": "Showreel-grade motion videos rendered from code: real product assets, a measured beat grid, a signed-off shot list, 2-D canvas and three.js 3-D on the GPU, synthesized score and SFX, a critique loop on contact sheets, and frame-exact 16:9 / 9:16 / 1:1 delivery at -14 LUFS. Music and lyric videos for a supplied song, with word-aligned lyrics and a singer lip-synced to the vocal. No accounts or API keys needed; add motion-reel-voice for ElevenLabs voice-over.",
   "author": {
     "name": "Aries Spring",
     "url": "https://github.com/Aries-Spring"
@@ -18,6 +18,10 @@
     "canvas",
     "promo",
     "voice-over",
-    "lip-sync"
+    "lip-sync",
+    "music-video",
+    "lyric-video",
+    "three.js",
+    "3d"
   ]
 }

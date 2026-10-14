@@ -19,6 +19,9 @@ change, a rendered scene costs an hour.
 - **End card** holds >= 1.5 s: name/URL + one line in the brand's own words.
 - **Transitions are motivated:** a shape, a motion or a colour carries into the next shot (match cut,
   push-through, wipe by an element). Say what carries.
+- **Music videos** (references/lyrics.md): one row per lyric line or per 4-8 beats; the "on screen"
+  column names the image the line points at and the lyric style used; big changes on section starts.
+  Plan a model sheet for any character alongside the table.
 
 ## Template
 
