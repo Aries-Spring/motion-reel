@@ -13,7 +13,7 @@
 //   ... --hits              dump the film's visual hit list -> out/<film>/hits.json
 //   ... --poster [t]        one still at t (default: film.json "poster") -> out/<film>/poster.png
 //
-// Flags: --fps 60  --workers 6  --noblur  --keep (also write the PNG frames)  --cpu | --gpu
+// Flags: --fps 60  --workers 6  --browsers 1  --noblur  --keep (also write the PNG frames)  --cpu | --gpu
 //        --format 9x16  16x9 (1920x1080, default) | 9x16 (1080x1920) | 1x1 (1080x1080). The page gets
 //                       ?format=&w=&h= and lays itself out; outputs other than 16x9 get a _<format> suffix.
 //
@@ -90,8 +90,8 @@ function ffmpeg(argv) {
 }
 
 async function openPages(browser, url, n) {
-  return Promise.all(Array.from({ length: n }, async () => {
-    const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+  return Promise.all(Array.from({ length: n }, async (_, i) => {
+    const page = await (browser.pool ? browser.pool[i % browser.pool.length] : browser).newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
     page.on('pageerror', (e) => console.error('[page]', e.message));
     // name what's missing (Chromium's own message has no URL); the template's woff2-then-ttf font
     // fallback and the favicon are expected 404s
@@ -193,7 +193,13 @@ const gpuArgs = process.platform === 'darwin'
 const server = await serve();
 const url = `http://127.0.0.1:${server.address().port}/${FILM}/index.html` +
   `?render=1&blur=${BLUR ? 1 : 0}&fps=${FPS}&format=${FORMAT}&w=${W}&h=${H}`;
-const browser = await chromium.launch({ args: ['--font-render-hinting=none', '--disable-lcd-text', ...(GPU ? gpuArgs : [])] });
+// --browsers N spreads the worker pages over N Chromium instances. Pages in one browser share its GPU process,
+// which captures their screenshots one at a time: on a GPU box that, not the film, is the bottleneck.
+const BROWSERS = Math.max(1, Number(opt('browsers', 1)));
+const launchArgs = { args: ['--font-render-hinting=none', '--disable-lcd-text', ...(GPU ? gpuArgs : [])] };
+const pool = await Promise.all(Array.from({ length: BROWSERS }, () => chromium.launch(launchArgs)));
+const browser = pool[0];
+browser.pool = pool;
 const rel = (p) => path.relative(ROOT, p);
 async function reportGL(page) {
   const r = await page.evaluate(() => {
@@ -300,6 +306,6 @@ try {
     console.log(`-> ${rel(mp4)}  (${((Date.now() - t0) / 60000).toFixed(1)} min)`);
   }
 } finally {
-  await browser.close();
+  await Promise.all(pool.map((b) => b.close()));
   server.close();
 }

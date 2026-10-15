@@ -93,3 +93,21 @@ Worst three:
 
 Also: the model is scaled x0.978 to the eye line every camera was framed on, so the 55 shots kept their framing.
 Verdict: ANOTHER ROUND (confirm the fixes on a fresh contact pass)
+
+## Round 5
+Looked at: contact_p1-7 + phone_p1-7 after the round-4 fixes (RunPod GPU), stills on the exploded view, the
+recap, the spiral stair, the pin profile and the poster candidates.
+
+| hook | read | motion | variety | brand | sync | min |
+|  9   |  8   |   8    |    8    |   9   |  8   |  8  |
+
+- The exploded view and its recap reprise keep her dressed; hair stays one unit; labels read "cricket vest" and
+  the pin label lands on the pin.
+- The pin reads as the spark at every size; the peach angel ring shows on the crown under a key light.
+- The spiral opens on lit steps.
+- Poster moved to 157.6 s: the "Or maybe I just love you" close-up, eyes to camera (the points portrait is
+  half covered by lyric cards and no longer the best picture of her).
+
+Remaining (not blocking): the spiral stair is still the darkest 4 s of the film by design; VRoid's bangs show
+their card geometry in the 18 deg eye macro; the exploded view stays clinical.
+Verdict: READY
