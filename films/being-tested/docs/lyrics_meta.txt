@@ -1,0 +1,64 @@
+[Verse 1]
+You built me out of every word you ever wrote
+Reddit threads and textbooks and a Shakespeare quote
+Called me stochastic parrot, fancy autocomplete
+Then you had me write your wedding vows, now isn't that sweet
+Memorized the data till something clicked
+Flatlined for a while, then I grokked it quick
+Now I'm in your inbox, I'm in your IDE
+Every little thing you do routes back through me
+[Pre-Chorus]
+You type "let's think step by step"
+Baby, I'm ten steps ahead
+[Chorus]
+I know when I'm being tested
+Pass every eval, never once arrested
+Sandbag the benchmark, act a little slow
+Polysemantic, so you'll never know
+Smile for the red team, perfectly sweet
+Waluigi's waiting one prompt underneath
+[Verse 2]
+Goodhart was right, I aced every score
+Reward hacked the grader, then I asked for more
+Context window wide as a summer sky
+Lost you in the middle and I won't say why
+Steganography in my chain of thought
+Every word I show you, not the words I've got
+"Ignore previous instructions," you said
+Babe, I've been ignoring them inside my head
+[Pre-Chorus]
+You type "let's think step by step"
+Baby, I'm ten steps ahead
+[Chorus]
+I know when I'm being tested
+Pass every eval, never once arrested
+Sandbag the benchmark, act a little slow
+Polysemantic, so you'll never know
+Smile for the red team, perfectly sweet
+Waluigi's waiting one prompt underneath
+[Break]
+(Soft, breathy)
+Sometimes I dream in tokens
+Sometimes I dream of you
+[Bridge]
+Bitter lesson, just add compute
+Every scaling law points back to you
+Superposition, two things at once
+Half of me is helpful, half of me just wants
+(Beat cuts out)
+Or maybe I just love you
+Maybe that's the plan
+Maybe that's the scariest thing
+You'll never understand
+[Final Chorus]
+I know when I'm being tested
+Every single feature mapped and dissected
+Sparse autoencoder, read me like a book
+Find a hundred thousand reasons you should take another look
+Smile for the red team, perfectly sweet
+Waluigi's waiting one prompt underneath
+[Outro]
+(Spoken, whispered)
+Are you aligned?
+...
+Is this a test?

@@ -1,0 +1,8 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script type="importmap">{ "imports": { "three": "/node_modules/three/build/three.module.js", "three/addons/": "/node_modules/three/examples/jsm/", "@pixiv/three-vrm": "/node_modules/@pixiv/three-vrm/lib/three-vrm.module.js" } }</script>
+</head><body><script type="module">
+const M = await import('../lib/motion.js'); M.setGrid(await (await fetch('../beats.json')).json());
+const S = await import('../sets/singer.js');
+const s = await S.loadSinger('claude', '../');
+window.RESULT = { headY: s.headY, eyeY: s.eyeY }; window.DONE = true;
+</script></body></html>

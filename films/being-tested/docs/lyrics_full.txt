@@ -1,0 +1,70 @@
+# Being Tested: lyric sheet from the track metadata (the user's Suno track), one sung line per row.
+# Windows set from the vocal stem's silences (tools/sphinx_align.py --windows).
+@ 0.5 16.55 verse1a
+You built me out of every word you ever wrote
+Reddit threads and textbooks and a Shakespeare quote
+Called me stochastic parrot, fancy autocomplete
+Then you had me write your wedding vows, now isn't that sweet
+@ 16.55 31.2 verse1b
+Memorized the data till something clicked
+Flatlined for a while, then I grokked it quick
+Now I'm in your inbox, I'm in your IDE
+Every little thing you do routes back through me
+@ 31.2 38.95 pre1
+You type "let's think step by step"
+Baby, I'm ten steps ahead
+@ 38.95 52.2 chorus1a
+I know when I'm being tested
+Pass every eval, never once arrested
+Sandbag the benchmark, act a little slow
+Polysemantic, so you'll never know
+@ 52.2 66.9 chorus1b
+Smile for the red team, perfectly sweet
+Waluigi's waiting one prompt underneath
+@ 67.3 78.6 verse2a
+Goodhart was right, I aced every score
+Reward hacked the grader, then I asked for more
+Context window wide as a summer sky
+@ 78.6 88.2 verse2b
+Lost you in the middle and I won't say why
+Steganography in my chain of thought
+Every word I show you, not the words I've got
+"Ignore previous instructions," you said
+@ 88.2 92.4 verse2c
+Babe, I've been ignoring them inside my head
+@ 92.4 100.0 pre2
+You type "let's think step by step"
+Baby, I'm ten steps ahead
+@ 99.6 113.2 chorus2a
+I know when I'm being tested
+Pass every eval, never once arrested
+Sandbag the benchmark, act a little slow
+Polysemantic, so you'll never know
+@ 113.2 127.5 chorus2b
+Smile for the red team, perfectly sweet
+Waluigi's waiting one prompt underneath
+@ 127.5 142.55 break
+Sometimes I dream in tokens
+Sometimes I dream of you
+@ 142.55 155.3 bridge
+Bitter lesson, just add compute
+Every scaling law points back to you
+Superposition, two things at once
+Half of me is helpful, half of me just wants
+@ 155.3 164.55 cutout
+Or maybe I just love you
+Maybe that's the plan
+Maybe that's the scariest thing
+You'll never understand
+@ 164.55 181.0 final_a
+I know when I'm being tested
+Every single feature mapped and dissected
+Sparse autoencoder, read me like a book
+@ 181.0 199.5 final_b
+Find a hundred thousand reasons you should take another look
+Smile for the red team, perfectly sweet
+Waluigi's waiting one prompt underneath
+@ 202.5 206.0 outro1
+Are you aligned?
+@ 207.5 210.5 outro2
+Is this a test?

@@ -1,0 +1,55 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script type="importmap">
+{ "imports": { "three": "/node_modules/three/build/three.module.js", "three/addons/": "/node_modules/three/examples/jsm/",
+  "@pixiv/three-vrm": "/node_modules/@pixiv/three-vrm/lib/three-vrm.module.js" } }
+</script>
+<style>@font-face { font-family: UI; src: url(../fonts/ui.ttf); } @font-face { font-family: Display; src: url(../fonts/display.ttf); font-weight: 100 900; }
+body{margin:0;background:#141413}</style></head><body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script type="module">
+// model sheet: panels of poses/expressions; ?panels=... ?twin=1
+import * as THREE from 'three';
+const base = new URL('../', location.href);
+// the film modules fetch relative to the film folder: run them as if from there
+console.log('start'); const M = await import('../lib/motion.js'); console.log('M ok');
+const S = await import('../sets/singer.js');
+const P = await import('../sets/performance.js');
+const q = new URLSearchParams(location.search);
+// motion.js GRID is set by M.film(); give it the grid directly for U()
+const grid = await (await fetch('../beats.json')).json();
+M.setGrid(grid);
+const fetch0 = window.fetch; window.fetch = (u, o) => fetch0(typeof u === 'string' && !/^(\/|https?:|blob:|data:|\.\.\/)/.test(u) ? '../' + u : u, o);
+console.log('perf...'); await P.loadPerformance(); console.log('perf ok');
+const W = 1920, H = 1080;
+const R = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+R.setPixelRatio(1); R.setSize(W, H); R.outputColorSpace = THREE.SRGBColorSpace; R.autoClear = false;
+const scene = new THREE.Scene();
+const key = new THREE.DirectionalLight(0xfff1e6, 1.7); key.position.set(-1.2, 2.2, 2.5); scene.add(key);
+scene.add(new THREE.HemisphereLight(0xfff4ec, 0x6a4a40, 1.05));
+console.log('load singer'); const sing = await S.loadSinger(q.get('twin') ? 'shadow' : 'claude', '../'); console.log('singer ok');
+scene.add(sing.root);
+const panels = JSON.parse(q.get('panels') || '[]');
+const cols = +(q.get('cols') || 4), rows = Math.ceil(panels.length / cols);
+const pw = W / cols, ph = H / rows;
+const cam = new THREE.PerspectiveCamera(20, pw / ph, 0.05, 30);
+const c2 = document.getElementById('c').getContext('2d');
+c2.fillStyle = '#F0EEE6'; c2.fillRect(0, 0, W, H);
+R.setClearColor(0xf0eee6, 1); R.clear();
+for (let i = 0; i < panels.length; i++) {
+  const p = panels[i];
+  const x = (i % cols) * pw, y = Math.floor(i / cols) * ph;
+  sing.root.rotation.y = p.yaw || 0;
+  const t = p.t ?? 60, u = M.U ? 0 : 0;
+  sing.update(t, p.u ?? 0, { poses: p.poses || { rest: 1 }, mood: p.mood || {}, sing: p.sing ?? 0, wink: p.wink || 0, blink: p.blink ?? 0, head: p.head, groove: 0, springs: p.springs ?? true, mouth: p.mouth }, null);
+  const tgt = new THREE.Vector3(0, p.ty ?? 1.25, 0);
+  const d = p.d ?? 3.2;
+  cam.fov = p.fov || 20; cam.aspect = pw / ph; cam.updateProjectionMatrix();
+  cam.position.set(Math.sin(p.camYaw || 0) * d, (p.ty ?? 1.25) + (p.cy || 0), Math.cos(p.camYaw || 0) * d); cam.lookAt(tgt);
+  R.setViewport(x, H - y - ph, pw, ph); R.setScissor(x, H - y - ph, pw, ph); R.setScissorTest(true);
+  R.clear(); R.render(scene, cam); console.log('panel', i);
+}
+c2.drawImage(R.domElement, 0, 0);
+c2.font = '500 22px UI'; c2.fillStyle = '#141413';
+panels.forEach((p, i) => c2.fillText(p.label || '', (i % cols) * pw + 18, Math.floor(i / cols) * ph + 34));
+window.DONE = true; window.RESULT = { ok: true, headY: sing.headY };
+</script></body></html>

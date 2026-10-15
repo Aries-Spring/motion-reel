@@ -1,0 +1,6 @@
+node_modules/
+out/
+# audio renders and stems are rebuilt by the pipeline (beats.py / tempomap, demucs, sfx.mjs, mix.mjs)
+*/audio/*.wav
+*/audio/stems/
+*/audio/*.mp3
