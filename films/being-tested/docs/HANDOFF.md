@@ -34,7 +34,8 @@ call the skill folder `<skill>` (the motion-reel plugin's `skills/motion-reel`; 
 - `render.mjs --gpu` on Linux uses `--use-angle=vulkan --enable-features=Vulkan --disable-vulkan-surface`
   (`tools/gpuprobe.mjs` compares flag sets). A film frame takes ~40 ms on the GPU, but each screenshot takes
   ~500 ms and pages in one browser capture one at a time, so pass `--browsers N` (new in render.mjs) to spread
-  the workers over N Chromium instances. Contact passes ran at 2-3 fps with one browser.
+  the workers over N Chromium instances. Contact passes ran at 2-3 fps with one browser; the final render ran
+  12 workers on 6 browsers on an RTX 4090 at 9.7 fps (12,648 frames in 21.8 min, about $0.15 of pod time).
 - "No instances available" is common for a single GPU type: pass a list of GPUs, lower `--vcpu`, or use
   `--cloud SECURE`.
 
