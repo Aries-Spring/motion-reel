@@ -345,8 +345,8 @@ function shotSpiral(ctx, u, t, s) {
   fill(ctx, '#0C0B0A');
   const k = s.k, az = lerp(0.3, 2.4, k);
   G.renderSet(ctx, S.stairs, t, u, {
-    helix: 1, cam: { pos: [Math.sin(az) * 3.6, lerp(0.4, 1.6, k), Math.cos(az) * 3.6], at: [0, lerp(2.6, 3.6, k), 0], fov: 52, roll: 0.06 * Math.sin(u * 0.8) },
-    lit: 2 + (u - 203.5) * 1.6, singerStep: 15, yaw: undefined,
+    helix: 1, cam: { pos: [Math.sin(az) * 3.6, lerp(0.4, 1.6, k), Math.cos(az) * 3.6], at: [0, lerp(2.9, 3.6, k), 0], fov: 52, roll: 0.06 * Math.sin(u * 0.8) },
+    lit: 5 + (u - 203.5) * 1.4, singerStep: 15, yaw: undefined,
     dir: { poses: { hips: 1 }, mood: { relaxed: 0.6 }, groove: 0.4 },
   });
   FX.glow(ctx, 0.35);

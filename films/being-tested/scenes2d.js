@@ -435,7 +435,8 @@ export const SCENES2D = {
   },
   // 47 feature labels with leader lines to her parts (projected)
   featureLabels(ctx, u, u0, cam, singer) {
-    const parts = [['#0412  coral hair', [0, 1.62, -0.35]], ['#1207  spark catchlight', [0.03, singer.eyeY, 0.35]], ['#2048  the smile', [0, 1.33, 0.25]], ['#3301  spark pin', [0.07, 1.56, 0.1]], ['#4096  ivory tee', [0, 1.15, 0.28]], ['#5120  posture', [0, 0.75, 0.1]]];
+    const pin = singer.acc?.pin ? (singer.acc.pin.updateWorldMatrix(true, false), singer.acc.pin.matrixWorld.elements.slice(12, 15)) : [0.07, 1.56, 0.1];
+    const parts = [['#0412  coral hair', [0, 1.62, -0.35]], ['#1207  spark catchlight', [singer.eyeX ?? 0.03, singer.eyeY, 0.35]], ['#2048  the smile', [0, 1.33, 0.25]], ['#3301  spark pin', pin], ['#4096  cricket vest', [0, 1.15, 0.28]], ['#5120  posture', [0, 0.75, 0.1]]];
     parts.forEach(([lab, p], i) => {
       const a = clamp((u - u0 - i * 0.6) / 0.4);
       if (a <= 0) return;

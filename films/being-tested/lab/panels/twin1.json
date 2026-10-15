@@ -1,0 +1,8 @@
+[{"label":"twin · front","poses":{"hips":1},"d":4.8,"ty":0.86,"fov":24,"mood":{"relaxed":0.5,"angry":0.3}},
+ {"label":"twin · belt","poses":{"belt":1},"yaw":0.5,"d":2.2,"ty":1.2,"fov":24,"t":40.2,"sing":1,"mood":{"angry":0.3}},
+ {"label":"twin · peace","poses":{"peace":1},"d":2.0,"ty":1.22,"fov":24,"mood":{"happy":1}},
+ {"label":"twin · heart","poses":{"heart":1},"d":2.0,"ty":1.22,"fov":24,"mood":{"relaxed":0.5}},
+ {"label":"twin · face","d":1.15,"ty":1.4,"fov":20,"mood":{"relaxed":0.6,"angry":0.4}},
+ {"label":"twin · smirk","d":1.15,"ty":1.4,"fov":20,"yaw":-0.35,"mood":{"happy":0.55,"angry":0.35}},
+ {"label":"twin · profile","d":1.4,"ty":1.35,"fov":22,"yaw":-1.3},
+ {"label":"twin · back","d":2.4,"ty":1.15,"fov":26,"yaw":3.14}]

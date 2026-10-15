@@ -61,3 +61,35 @@ Remaining (not blocking): the exploded view is deliberately clinical; the window
 
 Checks: no banned defaults; longest gap without an event 4 beats; no cut opens on a blank (b84 opens on the first light bank); one accent; 16x9 only (by design); end card holds 1.8 s.
 Verdict: READY
+
+## Round 4: the new singer (Sendagaya Shino restyled as Claude, real MToon)
+Looked at: contact_p1-7 + phone_p1-7 rendered on a RunPod RTX A4500 (ANGLE/Vulkan, hardware WebGL), the model
+sheet (docs/model_sheet.png), stills on every close-up (open, eye macro, love, plan, half, points portrait) and
+on the exploded view.
+
+| hook | read | motion | variety | brand | sync | min |
+|  9   |  8   |   8    |    8    |   9   |  8   |  8  |
+
+- Hook: the opening macro is now a detailed face: lashes, coral bangs, a clay scan line across closed eyes that
+  open on "You" into an amber eye with a spark catchlight.
+- Read: unchanged; every line survives the phone pages.
+- Motion: every IK and FK pose survived the VRM 0 mirror (mic, belt, point, peace, heart, hips, float, sit); spring
+  hair now has 46 long strands that swing and settle on the replay.
+- Variety: unchanged; the close-ups carry more because the face holds up at 18 deg fov.
+- Brand: hair clay-to-peach with a peach angel ring, oat/ivory/slate uniform, clay ribbing, spark crest, spark
+  catchlights, spark hairpin, spark charm. The twin is the same girl inverted, ember tips and red-hot eyes.
+- Sync: SFX 57/57 on hits, -14.1 LUFS / -1.2 dBTP; median hit-to-onset 13.5 ms.
+
+Worst three:
+1. [b389-397, recap] The exploded view slid the skirt off and showed the base model's underwear, pulled her scalp
+   cap 40 cm back (bald head), and still labelled an "ivory tee" with the pin label on the wrong side -> skirt stays
+   put, hair moves as one unit, the underwear is recoloured slate shorts, labels read "cricket vest" and the pin
+   label tracks the pin.
+2. [every close-up] The spark hairpin read as a white daisy (thick bevelled rays) -> ten thin rays, shallow bevel:
+   it reads as the spark.
+3. [b0-4, b366-373] Shino's heavy bangs hid the closed eyes the scan line is meant to cross, and the eye macro used
+   the old model's hard-coded eye offset -> head tilted up 0.1, camera dropped 2 cm; the macro aims at the model's
+   own eye bone. Also: the spiral stair opened on 2 s of near-black -> five steps lit from the first frame.
+
+Also: the model is scaled x0.978 to the eye line every camera was framed on, so the 55 shots kept their framing.
+Verdict: ANOTHER ROUND (confirm the fixes on a fresh contact pass)

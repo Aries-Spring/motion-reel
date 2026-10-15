@@ -135,9 +135,9 @@ varying vec3 vWorldPos;
 const DISSOLVE = `if (vWorldPos.y > uDissolve) { float n = fract(sin(dot(floor(vWorldPos.xz * 140.0), vec2(12.9898, 78.233))) * 43758.5453);
         if (n < clamp((vWorldPos.y - uDissolve) * 6.0, 0.0, 1.0)) discard; }`;
 // explode axes per part (character space, metres at uExplode = 1)
-const PART_AXIS = [[/Hair_00_HAIR/, [0, 0.06, -0.16]], [/HairBack/, [0, 0.02, -0.4]], [/EyeHighlight/, [0, 0, 0.62]], [/EyeIris|EyeExtra/, [0, 0, 0.5]], [/EyeWhite/, [0, 0, 0.38]],
+const PART_AXIS = [[/Hair_00_HAIR/, [0, 0.06, -0.14]], [/HairBack/, [0, 0.06, -0.16]], [/EyeHighlight/, [0, 0, 0.62]], [/EyeIris|EyeExtra/, [0, 0, 0.5]], [/EyeWhite/, [0, 0, 0.38]],
   [/FaceEyeline|FaceEyelash|FaceBrow/, [0, 0.04, 0.46]], [/FaceMouth/, [0, -0.04, 0.3]], [/Face_00/, [0, 0, 0.2]], [/AccessoryNeck/, [0, 0.03, 0.4]], [/Tops/, [0, 0.05, 0.28]],
-  [/Bottoms/, [0, -0.25, 0.15]], [/Shoes/, [0, -0.45, 0.1]], [/Body/, [0, 0, 0]]];
+  [/Bottoms/, [0, 0, 0.03]], [/Shoes/, [0, -0.45, 0.1]], [/Body/, [0, 0, 0]]];
 const axisFor = (n) => (PART_AXIS.find(([re]) => re.test(n)) || [0, [0, 0, 0]])[1];
 // splice the film's uniforms into a three-vrm MToonMaterial (surface or outline pass); MToon's own
 // onBeforeCompile (its #defines) runs first
@@ -322,6 +322,8 @@ function restyle(vrm, look, U) {
       } else if (/Shoes/.test(n)) {
         tex = once('shoes', () => toTex(recolor(map, remapFn(L.shoes, 0.0, 0.5)).cv, map));
       } else if (/SKIN/.test(n)) {
+        // the base's white underwear becomes slate shorts (seen in the exploded view and from below)
+        if (/Body_00/.test(n)) tex = once('body', () => toTex(recolor(map, (R, G, B, u, v) => (u > 0.18 && u < 0.62 && v > 0.42 && v < 0.72 && B >= R - 18 && lum(R, G, B) > 90 ? grad(L.skirt, lum(R, G, B) / 255 * 0.8) : null)).cv, map));
         if (!out) m.shadeColorFactor.copy(C(L.skinShade));
       }
       if (tex) { m.map = tex; if (m.shadeMultiplyTexture) m.shadeMultiplyTexture = tex; }
@@ -353,7 +355,7 @@ function accessories(vrm, look, U, hidden) {
   };
   const pinMat = toonMat(L.pin, U, { emissive: L.pinEmissive });
   pinMat.userData.keep = true;
-  const pin = new THREE.Mesh(new THREE.ExtrudeGeometry(sparkShape(1, 10, 4, 0.085), { depth: 0.16, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.03, bevelSegments: 2 }), pinMat);
+  const pin = new THREE.Mesh(new THREE.ExtrudeGeometry(sparkShape(1, 10, 4, 0.06), { depth: 0.14, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.02, bevelSegments: 2 }), pinMat);
   pin.scale.setScalar(0.03); pin.position.z = -0.003;
   const pinG = new THREE.Group(); pinG.add(pin);
   const headW = head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.07, 0));
