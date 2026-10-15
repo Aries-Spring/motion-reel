@@ -7,25 +7,36 @@ call the skill folder `<skill>` (the motion-reel plugin's `skills/motion-reel`; 
 
 ## Where it stands
 
-- **v1 is complete in the repo.** It has 55 shots, ten lyric styles, sixteen 3-D sets and five motivated
-  transitions. The critique ran 3 rounds and the last one was READY (every score 8); see `docs/critique.md`
-  and `docs/shotlist.md` (concept: "The Eval").
-- **The final render was never delivered.** It was stopped when the user said the singer "looks mid af"
-  and asked for a better model with more detail, "more artistic".
-- **Current task: swap the singer** from pixiv's VRM1 sample (`assets/vrm/base.vrm`) to
-  **Sendagaya Shino** (`assets/vrm/shino.vrm`, VRoid beta preset, CC0; see
-  `assets/vrm/CREDITS.md`). She has long hair, elegant gradient eyes and a school uniform, which fits a
-  song about being tested. Restyle her into Claude: coral hair, an ivory/oat and clay uniform, and spark
-  accents. The twin is the same model with an inverted palette (`LOOKS.shadow`).
-- **The new session has full network access.** Before committing to Shino, a quick look for a better
-  model is fair if it is clearly licensed for modification and redistribution (CC0, VRoid's sample
-  terms, or VPL). Most VRoid Hub models disallow redistribution, and this repo is public.
-- **GPU rendering on RunPod is now possible.** The user offered a RunPod account. The key must come from
-  the environment, as an env var or network secret named `RUNPOD_API_KEY`; never ask for it in chat and
-  never write it to a file. If it is set, consider rendering on a GPU pod. SwiftShader runs at about
-  1.1 fps, so the full film takes about 3 h at 4 workers. On a GPU, the real three-vrm `MToonMaterial`
-  becomes affordable, which is a big part of looking "more artistic". The toon substitute in
-  `singer.js` exists only because MToon costs about 4x per pixel in software GL.
+- **v2 is complete.** It has 55 shots, ten lyric styles, sixteen 3-D sets and five motivated transitions
+  (concept "The Eval", `docs/shotlist.md`). The singer is now **Sendagaya Shino** (`assets/vrm/shino.vrm`,
+  VRoid beta preset, CC0) restyled as anime-girl Claude on the real three-vrm MToon. The critique ran 5 rounds;
+  round 5 is READY (hook 9, read 8, motion 8, variety 8, brand 9, sync 8). See `docs/critique.md` and
+  `docs/model_sheet.png`.
+- **Delivered:** `out/being-tested/final.mp4` (16x9, rendered on a RunPod GPU, mixed at -14 LUFS), the
+  contact sheet and `poster.png` at 157.6 s (the "Or maybe I just love you" close-up).
+- **Model search (session 2):** VRoid's AvatarSample_A-C are under more restrictive terms (left out of the CC0
+  set) and Seed-san (VirtualCast, VPL, redistributable) is a short-haired robot-arm design, so Shino stayed.
+- **Remaining (not blocking):** the spiral stair (b203-212) is the darkest 4 s by design; VRoid's bang cards
+  show their geometry in the 18 deg eye macro; the exploded view is clinical.
+
+## GPU renders on RunPod
+
+- The key comes from the env var `RUNPOD_API_KEY` only; never print it or write it anywhere.
+- `tools/runpod.py create --job probe|contact|render|custom [--args "..."] [--gpu "A,B"] [--vcpu N]` creates a
+  pod on `mcr.microsoft.com/playwright:v1.56.1-noble` with `NVIDIA_DRIVER_CAPABILITIES=all`. Its start command
+  clones this branch at the pushed HEAD, installs ffmpeg and the Vulkan loader, runs the job's fixed commands
+  and serves `/work/out` read-only on port 8000 through RunPod's HTTPS proxy. The pod takes no commands after
+  creation. **Push before creating a pod**: it renders the pushed commit. Picture renders need no audio, so the
+  song never leaves this machine.
+- `runpod.py status`, `get <file> <dest>` and `kill` (always kill: billing runs until then). Set
+  `RUNPOD_STATE` to a scratch path; it records the current pod id. Cloudflare refuses urllib's default
+  User-Agent (error 1010), so the script sends its own.
+- `render.mjs --gpu` on Linux uses `--use-angle=vulkan --enable-features=Vulkan --disable-vulkan-surface`
+  (`tools/gpuprobe.mjs` compares flag sets). A film frame takes ~40 ms on the GPU, but each screenshot takes
+  ~500 ms and pages in one browser capture one at a time, so pass `--browsers N` (new in render.mjs) to spread
+  the workers over N Chromium instances. Contact passes ran at 2-3 fps with one browser.
+- "No instances available" is common for a single GPU type: pass a list of GPUs, lower `--vcpu`, or use
+  `--cloud SECURE`.
 
 ## Not in the repo (it is public): restore first
 
@@ -105,56 +116,29 @@ call the skill folder `<skill>` (the motion-reel plugin's `skills/motion-reel`; 
   Matcap_RimHair and 6 is Matcap_Rim. Both have black centres and a bright rim, so sample them with
   view-space normal uv and add them.
 
-## The swap: plan (in `sets/singer.js`)
+## The singer as built (`sets/singer.js`)
 
-1. **Model file and VRM0 handling.**
-   - Give `loadSinger(look, base, file = 'assets/vrm/shino.vrm')` a model file parameter.
-   - Call `VRMUtils.rotateVRM0(vrm)` when `vrm.meta.metaVersion === '0'`.
-   - **FK eulers authored for VRM1 must flip for VRM0** normalized bones: `[x, y, z] → [-x, y, -z]`.
-     That covers POSES, the groove `add` table, `dir.head` and `dir.bones`. Do it in one place in
-     `applyPose`.
-   - **The IK runs in character space.** The current `solveArm` and `armRest` work in world space and
-     assume the rest world rotation is identity. After `rotateVRM0` that no longer holds, because
-     `vrm.scene` is turned 180°. Solve in `root`-local (character) space, or build `armRest` with the
-     rotation in place.
-   - **IK targets in POSES are absolute metres for the old model** (head at y 1.39). Scale them by
-     `headY / 1.39`, or make them head-relative.
-2. **Shino restyle (`restyle()`, keyed on material names).**
-   - The VRoid names match the old ones (`HAIR`, `EyeIris`, `Tops`, `Bottoms`, `Shoes`, `SKIN`). Add
-     `EyeExtra`, `FaceEyelash` and `AccessoryNeck`, and split `HAIR_02` (the clip) from the hair.
-   - Hair: coral gradient (the `LOOKS.claude.hair` stops) with spec streaks in peach.
-   - Brows and eyeline: warm brown.
-   - Iris: amber-coral, with the spark catchlights (`sparkPath`).
-   - Tops (17): ivory/oat vest and shirt, slate collar, and a spark emblem.
-   - Bow (19): clay. Skirt (20): slate. Shoes (21): dark, with the clay accent.
-   - Keep the spark hairpin, choker and pendant, but **re-fit their bone-local offsets**, which were
-     tuned for the old head and neck. Re-fit the **mic offset** in the right hand too.
-   - Add the new material names to `PART_AXIS` for the exploded view.
-3. **Material: an MToon-lite shader** if rendering stays on SwiftShader; otherwise use the real
-   MToon on a GPU.
-   - Build it on `MeshBasicMaterial` plus `onBeforeCompile`.
-   - Lighting: key direction as a world uniform turned into view space, key colour, and hemisphere
-     sky/ground ambient. `singerLights().set()` pushes its state into the singer uniforms.
-   - Per material: shade colour from `_ShadeColor`, base from `_Color`, and the `_SphereAdd` matcap.
-   - Keep the existing uniforms: rim, scan, tint, lift, glow, dissolve (default 100 = off) and explode.
-   - Use the inverted-hull outlines as now.
-4. **Check the look before the film.**
-   - Re-render the model sheet with the new file, then twin=1.
-   - Check `--at` stills of the close-ups. `film.js` cameras use `CLAUDE.eyeY` and `TWIN.eyeY`, so most
-     follow automatically. The eye catchlight macro (around line 552) has a hard-coded eye x offset of
-     0.034 that needs checking.
-   - Run a contact pass (`render.mjs --film being-tested --contact --every 2`) and append a round 4 to
-     `docs/critique.md`.
-   - Commit `docs/model_sheet.png` from the new model.
-5. **Render and deliver** (skill step 7).
-   - Render: `node <skill>/scripts/render.mjs --film being-tested --format 16x9 --video-only --workers 4`.
-     Run it under `nohup`, detached. Never `pkill -f` a pattern that also matches your own waiting
-     shell; that killed the shell once.
-   - Then run `sfx.mjs`, then `mix.mjs`, which muxes `out/being-tested/final.mp4` at -14 LUFS.
-   - Then the poster: `render.mjs --poster`; the poster time is 183.4, the points portrait.
-   - Check with ffprobe (duration 210.8, 60 fps, yuv420p, audio present) and pull one frame from the
-     encoded file.
-   - Send `final.mp4` with SendUserFile, plus the contact sheet, poster, scores and next improvements.
+- `loadSinger(look, base, file = 'assets/vrm/shino.vrm')`. VRM 0: `rotateVRM0`, then FK eulers authored for
+  VRM 1 are mirrored `[x, y, z] -> [-x, y, -z]` in one place (`eul()` in `applyPose`), the hips sway x too.
+- The model is scaled so her eye bone sits at `FILM_EYE_Y` = 1.449 (the old model's): every hard-coded camera
+  kept its framing. IK targets in POSES are scaled by `headY / 1.39` (~1 after the scale).
+- IK: `armRest` is measured in `vrm.scene`'s local frame (where normalized bones rest at identity) and targets
+  go through `root` (character space). Pole and lower-arm axes are unchanged for VRM 0.
+- Materials stay three-vrm `MToonMaterial`. `hookMToon` chains onto MToon's own `onBeforeCompile` and splices
+  rim/scan/tint/lift/glow/dissolve/explode before the last `gl_FragColor`. **Meshes share materials** (all
+  46 hair strands use one): hook each material once (`userData.styled`), or the program fails with
+  "redefinition" and the hair vanishes.
+- Cel ramps per class `[toony, shift, matcap]`: face [0.6, 0.18, 0.25], skin [0.8, 0.02, 0.3],
+  hair [0.86, 0.04, 0.65], cloth [0.86, -0.02, 0.35]. VRoid ships 0.05-0.35, which reads as plastic.
+- Recolours: hair strands get a root-to-tip gradient along v times the strand detail (ratio to the row
+  mean); the spec map (emissiveMap) is the peach angel ring. Tops: shirt/piping/vest/rib by uv region
+  (`topsTex`, V-neck polygon `V_IN`/`V_OUT`), slate line in the ribs, spark crest at uv (0.615, 0.6) = her left
+  chest. Body: the base's white underwear becomes slate shorts. The X clip (`HAIR_02`) is hidden; the spark pin
+  sits at its bounding-box centre facing out from the head.
+- Expressions map through `EXPR` (VRM 0 customs keep their names: `Surprised`, `Extra` = the > < squint, usable
+  as `mood.extra`). `singer.eyeX/eyeZ` are exported for eye macros.
+- Lab: `lab/sheet.html?file=...&dbg=noOutline,noSprings,nan`, panels `lab/panels/shino1.json` and
+  `twin1.json` (the model sheet), `lab/inspect.html?m=shino.vrm` lists meshes and MToon parameters.
 
 ## Traps already hit (don't repeat)
 

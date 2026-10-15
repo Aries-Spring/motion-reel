@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **render.mjs on a Linux GPU.** `--gpu` on Linux launches Chromium on ANGLE/Vulkan, which finds an NVIDIA
+  card in a container started with `NVIDIA_DRIVER_CAPABILITIES=all` (checked on RTX 4090 and A4500 cloud pods:
+  a motion-blurred 3-D frame of this film draws in ~40 ms). `--browsers N` spreads the worker
+  pages over N Chromium instances: pages in one browser share its GPU process, which captures their
+  screenshots one at a time, so on a GPU box that, not the film, was the bottleneck.
+
 ## 1.3.0 - 2026-10-14
 
 Lessons from a 2.5-minute lyric video with ~20 three.js sets, folded back into the skill.
