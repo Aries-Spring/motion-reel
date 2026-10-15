@@ -21,6 +21,7 @@ REPO = 'https://github.com/Aries-Spring/motion-reel'
 BRANCH = 'claude/claude-music-video-0gps4j'
 IMAGE = 'mcr.microsoft.com/playwright:v1.56.1-noble'
 SKILL = '../skills/motion-reel/scripts'
+UA = 'motion-reel-runpod/1.0'   # Cloudflare refuses urllib's default agent (error 1010)
 
 # the pod's whole life: serve /work/out, set up, run the job, keep serving until killed
 SETUP = r'''
@@ -70,7 +71,7 @@ JOBS = {
 
 def call(method, path, body=None):
     req = urllib.request.Request(API + path, method=method, data=json.dumps(body).encode() if body else None,
-                                 headers={'Authorization': 'Bearer ' + os.environ['RUNPOD_API_KEY'], 'Content-Type': 'application/json'})
+                                 headers={'Authorization': 'Bearer ' + os.environ['RUNPOD_API_KEY'], 'Content-Type': 'application/json', 'User-Agent': UA})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             t = r.read()
@@ -80,7 +81,7 @@ def call(method, path, body=None):
 
 
 def proxy(pid, f):
-    return f'https://{pid}-8000.proxy.runpod.net/{f}'
+    return urllib.request.Request(f'https://{pid}-8000.proxy.runpod.net/{f}', headers={'User-Agent': UA})
 
 
 def main():
@@ -105,7 +106,7 @@ def main():
         p = call('POST', '/pods', body)
         STATE.write_text(json.dumps({'id': p['id'], 'job': a.job, 'commit': commit, 'created': time.time()}))
         print(f"pod {p['id']} {p.get('gpu', {}).get('displayName')} ${p.get('costPerHr')}/h  vcpu {p.get('vcpuCount')}  job {a.job} @ {commit[:8]}")
-        print('log:', proxy(p['id'], 'job.log'))
+        print('log:', proxy(p['id'], 'job.log').full_url)
     elif a.cmd == 'status':
         s = json.loads(STATE.read_text())
         p = call('GET', f"/pods/{s['id']}")

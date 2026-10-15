@@ -1,0 +1,8 @@
+[{"label":"front · rest","poses":{"rest":1},"d":4.8,"ty":0.86,"fov":24},
+ {"label":"3/4 · mic","poses":{"mic":1},"yaw":0.6,"d":4.8,"ty":0.86,"fov":24,"mood":{"relaxed":0.3}},
+ {"label":"profile · point","poses":{"point":1},"yaw":1.2,"d":4.8,"ty":0.86,"fov":24},
+ {"label":"back · open","poses":{"open":1},"yaw":3.14,"d":4.8,"ty":0.86,"fov":24},
+ {"label":"face · neutral","d":1.15,"ty":1.42,"fov":20},
+ {"label":"face · happy (red team)","d":1.15,"ty":1.42,"fov":20,"mood":{"happy":1}},
+ {"label":"face · sly wink","d":1.15,"ty":1.42,"fov":20,"mood":{"relaxed":0.6},"wink":1,"yaw":0.3},
+ {"label":"face · singing aa","d":1.15,"ty":1.42,"fov":20,"t":40.2,"sing":1}]

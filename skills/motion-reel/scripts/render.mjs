@@ -19,7 +19,9 @@
 //
 // WebGL: on macOS Chromium is launched on the GPU (ANGLE Metal) by default; headless Chromium otherwise
 // falls back to SwiftShader, ~80x slower for three.js scenes. --cpu forces software, --gpu asks for
-// the GPU elsewhere. The renderer in use is printed. 2-D-only films are unaffected either way.
+// the GPU elsewhere: on Linux that is ANGLE on Vulkan, which finds an NVIDIA card in a container started
+// with NVIDIA_DRIVER_CAPABILITIES=all (graphics libraries mounted). The renderer in use is printed.
+// 2-D-only films are unaffected either way.
 // Full renders stream frames straight into ffmpeg in order: no frames/ directory, no disk wall on long
 // films (a 2.5 min 1080p60 PNG sequence is ~28 GB).
 //
@@ -187,7 +189,7 @@ const beats = JSON.parse(fs.readFileSync(beatsPath, 'utf8'));
 const GPU = flag('cpu') ? false : flag('gpu') || process.platform === 'darwin';
 const gpuArgs = process.platform === 'darwin'
   ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist']
-  : ['--enable-gpu', '--ignore-gpu-blocklist'];
+  : ['--use-angle=vulkan', '--enable-features=Vulkan', '--disable-vulkan-surface', '--enable-gpu', '--ignore-gpu-blocklist'];
 const server = await serve();
 const url = `http://127.0.0.1:${server.address().port}/${FILM}/index.html` +
   `?render=1&blur=${BLUR ? 1 : 0}&fps=${FPS}&format=${FORMAT}&w=${W}&h=${H}`;

@@ -78,10 +78,10 @@ function shotOpen(ctx, u, t, s) {
   const d = logLerp(0.62, 0.48, E.inOutSine(k));
   const scanY = lerp(1.53, 1.40, E.inOutSine(prog(u, -1.2, 3.8)));
   G.renderSet(ctx, S.void, t, u, {
-    cam: { pos: [0.02, 1.452, d], at: [0, 1.447, 0], fov: 17, roll: -0.03 * (1 - k) },
+    cam: { pos: [0.02, 1.43, d], at: [0, 1.447, 0], fov: 17, roll: -0.03 * (1 - k) },
     scanY: lerp(1.53, 1.40, E.inOutSine(prog(u, -1.2, 3.8))), scanW: 0.0045,
     light: { key: lerp(0.12, 1.7, E.inQuad(prog(u, 2.6, 4.2))), az: -1.1, el: 0.3, rim: lerp(0.25, 0.7, prog(u, 2.6, 4.2)), hemi: 0.04 }, tint: lerp(0.32, 1, prog(u, 2.6, 4.2)),
-    dir: (tt, uu) => ({ poses: { rest: 1 }, groove: 0, sing: uu < 3.9 ? 0 : 1, blink: uu < 3.95 ? 1 : clamp(1 - (uu - 3.95) / 0.2), mood: { relaxed: 0.2 }, head: [0.05 * (1 - prog(uu, 3.9, 4.5)), 0, 0] }),
+    dir: (tt, uu) => ({ poses: { rest: 1 }, groove: 0, sing: uu < 3.9 ? 0 : 1, blink: uu < 3.95 ? 1 : clamp(1 - (uu - 3.95) / 0.2), mood: { relaxed: 0.2 }, head: [-0.1 + 0.03 * (1 - prog(uu, 3.9, 4.5)), 0, 0] }),
   });
   FX.glow(ctx, 0.5, 8);
 }
@@ -549,7 +549,7 @@ function shotPlan(ctx, u, t, s) {
     dir: { poses: { rest: 1 }, groove: 0, mood: { relaxed: 0.4, sad: 0.25 }, lookAt: [0.3, 1.45, 2] } });
 }
 function shotEye(ctx, u, t, s) {
-  cutCU(ctx, u, t, { cam: { pos: [0.034, CLAUDE.eyeY + 0.004, logLerp(0.36, 0.22, s.k)], at: [0.034, CLAUDE.eyeY, 0], fov: 18 },
+  cutCU(ctx, u, t, { cam: { pos: [CLAUDE.eyeX, CLAUDE.eyeY + 0.004, CLAUDE.eyeZ + logLerp(0.3, 0.16, s.k)], at: [CLAUDE.eyeX, CLAUDE.eyeY, CLAUDE.eyeZ], fov: 18 },
     dir: { poses: { rest: 1 }, groove: 0, mood: { sad: 0.15 } }, light: { key: 1.5 } });
 }
 function shotDark(ctx, u, t, s) {

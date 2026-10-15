@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script type="importmap">{ "imports": { "three": "/node_modules/three/build/three.module.js", "three/addons/": "/node_modules/three/examples/jsm/", "@pixiv/three-vrm": "/node_modules/@pixiv/three-vrm/lib/three-vrm.module.js" } }</script>
+</head><body><script type="module">
+// inspect.html?m=shino.vrm: every mesh of a raw VRM (material names, vertex count, bbox, outline settings)
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+const f = new URLSearchParams(location.search).get('m') || 'shino.vrm';
+const loader = new GLTFLoader(); loader.register((p) => new VRMLoaderPlugin(p));
+const g = await loader.loadAsync('../assets/vrm/' + f); const vrm = g.userData.vrm;
+VRMUtils.rotateVRM0(vrm); VRMUtils.removeUnnecessaryVertices(g.scene); VRMUtils.combineSkeletons(g.scene); vrm.scene.updateMatrixWorld(true);
+const out = [];
+vrm.scene.traverse((o) => { if (!o.isMesh) return; o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox;
+  out.push({ name: o.name, mats: [].concat(o.material).map((m) => `${m.name}|${m.isOutline ? 'OL ' + m.outlineWidthMode + ' ' + m.outlineWidthFactor.toFixed(5) : 'shade ' + (m.shadeColorFactor?.toArray().map((v) => v.toFixed(2)).join(','))}`), verts: o.geometry.attributes.position.count,
+    groups: o.geometry.groups.length, min: b.min.toArray().map((v) => +v.toFixed(2)), max: b.max.toArray().map((v) => +v.toFixed(2)) }); });
+const mats = {}; vrm.scene.traverse((o) => { if (o.isMesh) [].concat(o.material).forEach((m) => { if (!m.isOutline) mats[m.name] = { map: !!m.map, emissiveMap: !!m.emissiveMap, emissive: m.emissive?.toArray().map((v) => +v.toFixed(2)), matcap: !!m.matcapTexture, matcapF: m.matcapFactor?.toArray().map((v) => +v.toFixed(2)), rim: m.parametricRimColorFactor?.toArray().map((v) => +v.toFixed(2)), rimMix: m.rimLightingMixFactor, shift: m.shadingShiftFactor, toony: m.shadingToonyFactor, gi: m.giEqualizationFactor, shadeTex: !!m.shadeMultiplyTexture, emImg: m.emissiveMap ? `${m.emissiveMap.image?.width}x${m.emissiveMap.image?.height}` : '', mcImg: m.matcapTexture ? `${m.matcapTexture.image?.width}x${m.matcapTexture.image?.height}` : '', normal: !!m.normalMap, v0: m.v0CompatShade, alphaTest: m.alphaTest, transparent: m.transparent }; }); });
+window.RESULT = { mats, meshes: out, expressions: vrm.expressionManager.expressions.map((e) => e.expressionName) }; window.DONE = true;
+</script></body></html>
