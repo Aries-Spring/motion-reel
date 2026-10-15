@@ -1,0 +1,8 @@
+[{"label":"Claude · front","poses":{"rest":1},"d":4.5,"ty":0.84,"fov":24},
+ {"label":"3/4 · mic","poses":{"mic":1},"yaw":0.55,"d":4.5,"ty":0.84,"fov":24,"mood":{"relaxed":0.35}},
+ {"label":"profile · point","poses":{"point":1},"yaw":1.25,"d":4.5,"ty":0.84,"fov":24},
+ {"label":"back","poses":{"rest":1},"yaw":3.14,"d":4.5,"ty":0.84,"fov":24},
+ {"label":"neutral","d":1.1,"ty":1.33,"fov":20},
+ {"label":"red team smile","d":1.1,"ty":1.33,"fov":20,"mood":{"happy":1}},
+ {"label":"ten steps ahead","d":1.1,"ty":1.33,"fov":20,"mood":{"relaxed":0.6},"wink":1,"yaw":0.3},
+ {"label":"singing","d":1.1,"ty":1.33,"fov":20,"mouth":[0.85,0.1,0.05]}]

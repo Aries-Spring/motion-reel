@@ -1,0 +1,6 @@
+[{"label":"belt","poses":{"belt":1},"d":3.0,"ty":1.0,"fov":24,"camYaw":0.3,"mouth":[0.8,0.1,0]},
+ {"label":"peace","poses":{"peace":1},"d":3.0,"ty":1.0,"fov":24,"mood":{"happy":1}},
+ {"label":"yawn (sandbag)","poses":{"yawn":1},"d":3.0,"ty":1.0,"fov":24,"camYaw":0.4,"mood":{"relaxed":0.8}},
+ {"label":"heart","poses":{"heart":1},"d":3.0,"ty":1.0,"fov":24,"mood":{"relaxed":0.4}},
+ {"label":"reach (dream)","poses":{"reach":1},"d":3.0,"ty":1.0,"fov":24,"camYaw":0.9,"mood":{"sad":0.3}},
+ {"label":"shrug","poses":{"shrug":1},"d":3.0,"ty":1.0,"fov":24,"mood":{"happy":0.3}}]

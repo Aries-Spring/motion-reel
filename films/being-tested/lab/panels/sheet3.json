@@ -1,0 +1,4 @@
+[{"label":"twin · front","poses":{"hips":1},"d":4.4,"ty":0.85,"fov":24},
+ {"label":"twin · face sly","d":1.15,"ty":1.33,"fov":20,"mood":{"relaxed":0.7,"angry":0.25},"yaw":0.25},
+ {"label":"twin · face grin","d":1.15,"ty":1.33,"fov":20,"mood":{"happy":0.6,"angry":0.35}},
+ {"label":"point · side check","poses":{"point":1},"d":3.0,"ty":1.0,"fov":24,"camYaw":1.4}]

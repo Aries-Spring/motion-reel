@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script type="importmap">{ "imports": { "three": "/node_modules/three/build/three.module.js", "three/addons/": "/node_modules/three/examples/jsm/", "@pixiv/three-vrm": "/node_modules/@pixiv/three-vrm/lib/three-vrm.module.js" } }</script>
+<style>body{margin:0;background:#222}</style></head><body><canvas id="c" width="1920" height="1080"></canvas>
+<script type="module">
+// raw MToon look of candidate VRMs (?m=shino.vrm,candidates/x.vrm, paths under assets/vrm/): full figure + face per model
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+const files = (new URLSearchParams(location.search).get('m') || '').split(',');
+const W = 1920, H = 1080, cols = files.length, pw = W / cols;
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); R.setSize(W, H); R.setPixelRatio(1); R.outputColorSpace = THREE.SRGBColorSpace; R.autoClear = false;
+R.setClearColor(0xe9e4da, 1); R.clear();
+const loader = new GLTFLoader(); loader.register((p) => new VRMLoaderPlugin(p));
+const times = [];
+for (let i = 0; i < files.length; i++) {
+  const g = await loader.loadAsync('../assets/vrm/' + files[i]);
+  const vrm = g.userData.vrm; VRMUtils.rotateVRM0(vrm); VRMUtils.removeUnnecessaryVertices(g.scene); VRMUtils.combineSkeletons(g.scene);
+  const sc = new THREE.Scene(); sc.add(vrm.scene);
+  const L = new THREE.DirectionalLight(0xffffff, 2.4); L.position.set(-1, 2, 3); sc.add(L); sc.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const hb = (n) => vrm.humanoid.getNormalizedBoneNode(n);
+  hb('leftUpperArm').rotation.z = -1.2; hb('rightUpperArm').rotation.z = 1.2;
+  vrm.update(1 / 60);
+  const eye = new THREE.Vector3(); vrm.humanoid.getRawBoneNode('leftEye').getWorldPosition(eye);
+  const cam = new THREE.PerspectiveCamera(22, pw / (H / 2), 0.05, 50);
+  for (const [row, d, ty, fov] of [[0, 4.6, 0.82, 24], [1, 0.9, eye.y - 0.02, 22]]) {
+    cam.fov = fov; cam.aspect = pw / (H / 2); cam.updateProjectionMatrix(); cam.position.set(0, ty, d); cam.lookAt(0, ty, 0);
+    R.setViewport(i * pw, H - (row + 1) * H / 2, pw, H / 2); R.setScissor(i * pw, H - (row + 1) * H / 2, pw, H / 2); R.setScissorTest(true);
+    const a = performance.now(); R.render(sc, cam); R.getContext().readPixels(0, 0, 1, 1, R.getContext().RGBA, R.getContext().UNSIGNED_BYTE, new Uint8Array(4)); times.push(Math.round(performance.now() - a));
+  }
+  window['eye_' + i] = eye.y;
+}
+document.getElementById('c').getContext('2d').drawImage(R.domElement, 0, 0);
+window.RESULT = { times, eyes: files.map((f, i) => window['eye_' + i]) }; window.DONE = true;
+</script></body></html>

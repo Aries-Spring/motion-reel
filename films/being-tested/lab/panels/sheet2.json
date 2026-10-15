@@ -1,0 +1,12 @@
+[{"label":"mic","poses":{"mic":1},"d":3.0,"ty":1.0,"fov":24,"camYaw":0.3},
+ {"label":"belt","poses":{"belt":1},"d":3.0,"ty":1.0,"fov":24,"camYaw":0.3},
+ {"label":"hold","poses":{"hold":1},"d":3.0,"ty":1.0,"fov":24},
+ {"label":"point","poses":{"point":1},"d":3.0,"ty":1.0,"fov":24,"camYaw":0.5},
+ {"label":"peace","poses":{"peace":1},"d":3.0,"ty":1.0,"fov":24,"mood":{"happy":1}},
+ {"label":"hips","poses":{"hips":1},"d":3.0,"ty":1.0,"fov":24},
+ {"label":"shrug","poses":{"shrug":1},"d":3.0,"ty":1.0,"fov":24},
+ {"label":"yawn","poses":{"yawn":1},"d":3.0,"ty":1.0,"fov":24,"camYaw":0.4},
+ {"label":"heart","poses":{"heart":1},"d":3.0,"ty":1.0,"fov":24},
+ {"label":"reach","poses":{"reach":1},"d":3.0,"ty":1.0,"fov":24,"camYaw":0.7},
+ {"label":"hush","poses":{"hush":1},"d":3.0,"ty":1.0,"fov":24,"camYaw":0.3},
+ {"label":"think","poses":{"think":1},"d":3.0,"ty":1.0,"fov":24,"camYaw":0.3}]
