@@ -18,7 +18,7 @@ export async function loadPerformance() {
   const [ls, ly, ph] = await Promise.all(['lipsync.json', 'lyrics.json', 'phones.json'].map((f) => fetch(f).then((r) => r.json())));
   LS = ls; LINES = ly.lines;
   WORDS = LINES.flatMap((L, li) => L.words.map((w, wi) => ({ ...w, li, wi })));
-  buildMouth(ph); buildGlances();
+  buildMouth(ph); buildGlances(); buildPhrase();
   return { lines: LINES, words: WORDS };
 }
 export const lines = () => LINES;
@@ -261,27 +261,42 @@ export function singer(t, u, o = {}) {
 
 // ------------------------------------------------------------------ phrasing (the 3-D singer's body, pure functions of t)
 // From the lines and the phones, each 0..1: the breath she takes before a line (deeper with more room before it; let out
-// over the line) with the lips parting for it, a held or belted note (a vowel over 0.5 s, as loud as the smoothed
-// envelope says), accents on stressed vowels (long, loud and on the beat count most) and the settle after a line that
-// has room behind it (giving way to the next breath)
-const envL = (t) => { let s = 0; for (let k = -3; k <= 3; k++) s += envelope(t + k * 0.05); return s / 7; };   // +/-150 ms box
+// over the line) with the lips parting for it, a held or belted note (a vowel over 0.5 s, as loud as the envelope is
+// over it; notes under 0.4 s apart hold as one), accents on stressed vowels (long, loud and on the beat count most; the
+// strongest in any 0.45 s) and the settle after a line that has room behind it (giving way to the next breath). Each
+// is a smooth envelope of events fixed at load (under ~0.13 a frame at 60 fps), so nothing reads as a twitch
+let HELD = [], ACC = [];   // [a, b, loudness]; [t, strength]
+function buildPhrase() {
+  HELD = []; ACC = [];
+  for (const s of SEG) {
+    if (s.kind !== 'V') continue;
+    if (s.b - s.a >= 0.5) {
+      let e = 0; for (let k = 0; k < 8; k++) e += envelope(M.lerp(s.a, s.b, (k + 0.5) / 8)) / 8;
+      const g = smoothstep(0.2, 0.6, e), h = HELD[HELD.length - 1];
+      if (h && s.a - h[1] < 0.4) { h[1] = s.b; h[2] = Math.max(h[2], g); } else HELD.push([s.a, s.b, g]);
+    }
+    if (s.st) {
+      const ub = M.U(s.a), on = Math.cos(Math.PI * (ub - Math.round(ub))) ** 2, n = ACC.length;
+      const k = smoothstep(0.08, 0.25, s.b - s.a) * (0.4 + 0.6 * on) * smoothstep(0.15, 0.5, envelope(s.a + 0.06));
+      if (k < 0.15) continue;
+      if (!n || s.a - ACC[n - 1][0] >= 0.45) ACC.push([s.a, k]);
+      else if (k > ACC[n - 1][1] && (n < 2 || s.a - ACC[n - 2][0] >= 0.45)) ACC[n - 1] = [s.a, k];
+    }
+  }
+}
 export function phraseAt(t) {
   let breath = 0, part = 0, settle = 0, belt = 0, accent = 0;
   LINES.forEach((L, i) => {
     if (t < L.t0 - 0.6 || t > L.t1 + 1.4) return;
     const room = i ? L.t0 - LINES[i - 1].t1 : 9, after = i + 1 < LINES.length ? LINES[i + 1].t0 - L.t1 : 9;
-    const k = 0.4 + 0.6 * smoothstep(0.1, 0.5, room), D = 0.3 + 0.2 * smoothstep(0.1, 0.6, room);
+    const k = 0.4 + 0.6 * smoothstep(0.1, 0.5, room), D = 0.3 + 0.2 * smoothstep(0.1, 0.6, room), r = 0.45 * (D - 0.02);
     breath = Math.max(breath, k * smoothstep(L.t0 - D, L.t0 - 0.05, t) * (1 - smoothstep(L.t0, L.t0 + Math.max(0.8, 0.7 * (L.t1 - L.t0)), t)));
-    if (room >= 0.2) part = Math.max(part, k * smoothstep(L.t0 - D, L.t0 - D + 0.12, t) * (1 - smoothstep(L.t0 - 0.16, L.t0 - 0.04, t)));
+    // the lips part with the inhale and have met again just before the line (its first m/b/p)
+    if (room >= 0.2) part = Math.max(part, k * smoothstep(L.t0 - D, L.t0 - D + r, t) * (1 - smoothstep(L.t0 - 0.02 - r, L.t0 - 0.02, t)));
     settle = Math.max(settle, smoothstep(0.25, 0.8, after) * smoothstep(L.t1, L.t1 + 0.35, t) * (1 - smoothstep(L.t1 + 0.5, L.t1 + 1.4, t)));
   });
-  for (let j = segsBefore(t) - 1; j >= 0 && SEG[j].a > t - 6; j--) {
-    const s = SEG[j]; if (s.kind !== 'V') continue;
-    if (s.b - s.a >= 0.5) belt = Math.max(belt, smoothstep(s.a + 0.1, s.a + 0.5, t) * (1 - smoothstep(s.b - 0.05, s.b + 0.3, t)));
-    if (s.st && t - s.a < 0.4) {
-      const ub = M.U(s.a), on = Math.cos(Math.PI * (ub - Math.round(ub))) ** 2;
-      accent += smoothstep(0.08, 0.25, s.b - s.a) * (0.4 + 0.6 * on) * smoothstep(0.15, 0.5, envelope(s.a + 0.06)) * smoothstep(0, 0.08, t - s.a) * (1 - smoothstep(0.1, 0.4, t - s.a));
-    }
-  }
-  return { breath, part, settle: settle * (1 - breath), belt: belt * smoothstep(0.2, 0.6, envL(t)), accent: Math.min(1, accent) };
+  // into a held note once it is held (0.1-0.5 s in), out over 0.35 s; a nod that rises 0.2 s and falls 0.3 s
+  for (const [a, b, g] of HELD) if (t > a && t < b + 0.3) belt = Math.max(belt, g * smoothstep(a + 0.1, a + 0.5, t) * (1 - smoothstep(b - 0.05, b + 0.3, t)));
+  for (const [a, k] of ACC) if (t > a - 0.06 && t < a + 0.45) accent += k * smoothstep(a - 0.06, a + 0.14, t) * (1 - smoothstep(a + 0.14, a + 0.45, t));
+  return { breath, part, settle: settle * (1 - breath), belt, accent: Math.min(1, accent) };
 }
