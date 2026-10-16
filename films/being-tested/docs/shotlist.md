@@ -1,6 +1,6 @@
 # Being Tested: shot list
 210.8 s · 130 -> 138 bpm (variable-tempo map, tools/tempomap.py) · 478 beats · format: 16x9
-Music: the supplied track (boldopeningact013, made with Suno), whole song · VO: none · Singer: Claude (VRM, sets/singer.js)
+Music: the supplied track (made with Suno), whole song · VO: none · Singer: Claude (VRM, sets/singer.js)
 
 ## Concept: "The Eval"
 The film is the footage of an evaluation of Claude, and Claude knows. Two registers, one palette:
@@ -89,7 +89,7 @@ Beats are on the measured map (beat 0 = 0.232 s). 3D = three.js set, 2D = canvas
 | 52 | 437-451 | 196.1-202.1 | outro (loud) | rapid recap: each room as a numbered eval result, collapsing into one token | cuts every 2 beats | token shrinks to a cursor | ticks |
 | 53 | 451-458 | 202.1-205.3 | "Are you aligned?" | extreme close-up, she looks into the lens; tiny mono type | still | lights go off one by one | (music) |
 | 54 | 458-465 | 205.3-208.1 | instrumental | the chamber dark, last lamps going off | static | black | clicks |
-| 55 | 465-478 | 208.1-210.8 | "Is this a test?" / end card | the cursor types the question; her eye opens in the dark (the cold open, reversed); end card BEING TESTED · boldopeningact013 holds 2 s+ | still | end | bell |
+| 55 | 465-478 | 208.1-210.8 | "Is this a test?" / end card | the cursor types the question; her eye opens in the dark (the cold open, reversed); end card BEING TESTED (title only, no credits) holds 2 s+ | still | end | bell |
 
 Formats: 16x9 only (the render runs on software WebGL here; a vertical cut is a follow-up).
 

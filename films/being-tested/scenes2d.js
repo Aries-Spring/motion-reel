@@ -508,7 +508,6 @@ export const SCENES2D = {
     ctx.fillText('Being', W / 2, H / 2 - 30);
     ctx.font = `italic ${font(190, 700, D)}`; ctx.fillStyle = C.clay; ctx.fillText('Tested', W / 2, H / 2 + 150);
     ctx.letterSpacing = '0px';
-    text(ctx, 'boldopeningact013', W / 2, H / 2 + 270, font(40, 500, UI), C.cloud, 'center', 4);
     ctx.restore();
   },
 };
