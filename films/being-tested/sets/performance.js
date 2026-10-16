@@ -1,7 +1,10 @@
 // The singer's performance (from the skill's worked example): a singer's performance as a pure function of time, for vector_rig.js (or any rig
 // with the same state fields). From a music video: copy into <film>/.
-//   - mouth: the vocal stem's 100 Hz envelope (lipsync.json, from align.py) sets how open; the vowel
+//   - mouth (vector rig, mouthAt): the vocal stem's 100 Hz envelope (lipsync.json, from align.py) sets how open; the vowel
 //     being sung at that instant (lyrics.json word timing) sets the shape, blended over +/-40 ms
+//   - mouth (3-D singer, visemesAt): the phones of each lyric word (phones.json: CMUdict ARPAbet plus sphinx_align.py's
+//     extra words) laid out over the word's timing and blended by dominance, so syllables flap and the lips meet on
+//     m/b/p; the envelope only adds emphasis and a voicing gate. activityAt says how much she is singing (eases ~0.6 s)
 //   - seeded blinks every 2.2-4.5 s (fast close, slower open); none of them random at render time
 //   - idle head motion from value noise, a damped nod at every lyric line onset, a bob on the beat
 //   - follow-through: hair angles are the head's motion now minus 0.1 / 0.2 s ago, so the hair lags
@@ -12,9 +15,10 @@ import * as M from '../lib/motion.js';
 
 let LS = null, LINES = [], WORDS = [];
 export async function loadPerformance() {
-  const [ls, ly] = await Promise.all([fetch('lipsync.json').then((r) => r.json()), fetch('lyrics.json').then((r) => r.json())]);
+  const [ls, ly, ph] = await Promise.all(['lipsync.json', 'lyrics.json', 'phones.json'].map((f) => fetch(f).then((r) => r.json())));
   LS = ls; LINES = ly.lines;
   WORDS = LINES.flatMap((L, li) => L.words.map((w, wi) => ({ ...w, li, wi })));
+  buildMouth(ph);
   return { lines: LINES, words: WORDS };
 }
 export const lines = () => LINES;
@@ -63,6 +67,109 @@ export function mouthAt(t, gain = 1) {
   if (wsum) { wide /= wsum; round /= wsum; }
   open = Math.min(1, envelope(t) * 1.15 * gain);
   return { open, wide, round, smile: 0.25 - 0.2 * open };
+}
+
+// ------------------------------------------------------------------ the 3-D singer's mouth
+export const smoothstep = (a, b, x) => { const k = M.clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+// VRM visemes [aa, ih, ou, ee, oh]. On Shino aa .2 is a slit, .4 small, .6 clearly open, 1 VRoid's gape: every
+// target stays well under the full shapes
+const VIS = ['aa', 'ih', 'ou', 'ee', 'oh'];
+const vec = (o) => VIS.map((k) => o[k] || 0);
+// vowels: [target, diphthong glide target | null]
+const VOW = {
+  AA: [vec({ aa: 0.52 })], AE: [vec({ aa: 0.4, ee: 0.22 })], AH: [vec({ aa: 0.38 })], AO: [vec({ oh: 0.46, aa: 0.1 })],
+  AW: [vec({ aa: 0.46 }), vec({ ou: 0.55, oh: 0.1 })], AY: [vec({ aa: 0.5 }), vec({ ee: 0.36, ih: 0.25 })],
+  EH: [vec({ ee: 0.34, aa: 0.26 })], ER: [vec({ ou: 0.32, ih: 0.25, aa: 0.12 })], EY: [vec({ ee: 0.36, aa: 0.2 }), vec({ ee: 0.4, ih: 0.3 })],
+  IH: [vec({ ih: 0.45, ee: 0.22, aa: 0.15 })], IY: [vec({ ee: 0.44, ih: 0.4 })], OW: [vec({ oh: 0.46 }), vec({ ou: 0.58 })],
+  OY: [vec({ oh: 0.46 }), vec({ ee: 0.36, ih: 0.25 })], UH: [vec({ ou: 0.48, aa: 0.14 })], UW: [vec({ ou: 0.72, oh: 0.08 })],
+};
+const SCHWA = vec({ aa: 0.22, ih: 0.1 }), CLOSED = vec({});
+// consonants: [target, dominance, nominal s, floor s]; m/b/p dominate so the lips always meet
+const CONS = {};
+for (const [cs, ...v] of [['M B P', CLOSED, 4, 0.075, 0.05], ['F V', vec({ ih: 0.3, ee: 0.08 }), 2.5, 0.08, 0.04], ['W', vec({ ou: 0.6 }), 2, 0.06, 0.03],
+  ['R', vec({ ou: 0.3, ih: 0.15 }), 1.2, 0.06, 0.03], ['SH ZH CH JH', vec({ ou: 0.28, ih: 0.3 }), 1.5, 0.08, 0.035],
+  ['T D N L TH DH', vec({ ih: 0.3, aa: 0.06 }), 0.7, 0.06, 0.025], ['S Z', vec({ ih: 0.32, ee: 0.1 }), 0.9, 0.08, 0.03],
+  ['K G NG HH', vec({ aa: 0.12, ih: 0.1 }), 0.3, 0.06, 0.025], ['Y', vec({ ih: 0.35, ee: 0.25 }), 1, 0.05, 0.025]]) for (const c of cs.split(' ')) CONS[c] = v;
+const CAP = vec({ aa: 0.62, ih: 0.5, ou: 0.8, ee: 0.55, oh: 0.58 }), OPEN_MAX = 0.68;   // openness = aa + oh + ee / 2
+const FILL = vec({ aa: 0.28, ih: 0.08 });       // voiced in a line but no aligned vowel (a misaligned word): a neutral sung vowel
+const W5 = [1, 4, 6, 4, 1].map((w) => w / 16);  // +/-2 frame binomial, resampling t (no state)
+const wordKey = (w) => w.toLowerCase().replace(/[^a-z']/g, '').replace(/^'+|'+$/g, '');
+let SEG = [];   // { a, b, v0, v1, dom, tau, kind: V vowel | C consonant | R rest }, sorted by a
+function buildMouth(PH) {
+  SEG = [];
+  const rest = (a, b) => SEG.push({ a, b, v0: CLOSED, v1: null, dom: 1, tau: 0.06, kind: 'R' });
+  LINES.forEach((L, li) => {
+    const ws = L.words;
+    for (const w of ws) {
+      // consonants take their nominal time (at most 55% of the word, never under their floor); vowels share the rest,
+      // stressed 1, unstressed 0.55, the last one held x1.5 (sung)
+      const D = Math.max(0.06, w.t1 - w.t0);
+      const items = (PH[wordKey(w.w)] || ['AH1']).map((p) => {
+        const base = p.replace(/\d/g, ''), st = p.replace(/\D/g, '');
+        if (VOW[base]) return { V: true, v0: p === 'AH0' ? SCHWA : VOW[base][0], v1: VOW[base][1] || null, wt: st === '1' || st === '2' ? 1 : 0.55 };
+        const [v0, dom, dur, floor] = CONS[base] || CONS.T;
+        return { V: false, v0, dom, dur, floor };
+      });
+      const vi = items.filter((x) => x.V);
+      if (vi.length) vi[vi.length - 1].wt *= 1.5;
+      const cd = items.reduce((s, x) => s + (x.V ? 0 : x.dur), 0), sc = cd > 0 ? Math.min(1, (0.55 * D) / cd) : 1;
+      let cdur = items.map((x) => (x.V ? 0 : Math.max(x.floor, x.dur * sc)));
+      if (!vi.length) { const s = cdur.reduce((a, b) => a + b, 0); cdur = cdur.map((c) => (c * D) / s); }
+      const vt = D - cdur.reduce((a, b) => a + b, 0), vw = vi.reduce((s, x) => s + x.wt, 0);
+      let t = w.t0;
+      items.forEach((x, i) => {
+        const d = x.V ? (vt * x.wt) / vw : cdur[i];
+        SEG.push(x.V ? { a: t, b: t + d, v0: x.v0, v1: x.v1, dom: 1, tau: 0.05, kind: 'V' } : { a: t, b: t + d, v0: x.v0, v1: null, dom: x.dom, tau: 0.03, kind: 'C' });
+        t += d;
+      });
+    }
+    for (let i = 0; i + 1 < ws.length; i++) if (ws[i + 1].t0 - ws[i].t1 >= 0.06) rest(ws[i].t1, ws[i + 1].t0);
+    // closed for up to 0.6 s before and after the line, clipped to the gap to its neighbours (most gaps are under 0.3 s)
+    const pre = li ? ws[0].t0 - LINES[li - 1].words.at(-1).t1 : 9, post = li + 1 < LINES.length ? LINES[li + 1].words[0].t0 - ws.at(-1).t1 : 9;
+    if (pre >= 0.06) rest(ws[0].t0 - Math.min(0.6, pre), ws[0].t0);
+    if (post >= 0.06) rest(ws.at(-1).t1, ws.at(-1).t1 + Math.min(0.6, post));
+  });
+  SEG.sort((p, q) => p.a - q.a);
+}
+const segsBefore = (x) => { let lo = 0, hi = SEG.length; while (lo < hi) { const m = (lo + hi) >> 1; if (SEG[m].a <= x) lo = m + 1; else hi = m; } return lo; };
+const envS = (t) => { let s = 0; for (let k = -3; k <= 3; k++) s += envelope(t + k * 0.02); return s / 7; };   // +/-60 ms box
+// coarticulation: every segment pulls toward its target with dominance * exp(-(distance / tau)^2) (~120 ms vowel
+// attack and release, ~50-80 ms anticipation)
+function mouthRaw(t, gain) {
+  const num = [0, 0, 0, 0, 0], i = segsBefore(t + 0.3);
+  let den = 0, vw = 0;
+  for (let j = Math.max(0, i - 40); j < i; j++) {
+    const s = SEG[j]; if (s.b < t - 0.3) continue;
+    const w = s.dom * Math.exp(-((Math.max(0, s.a - t, t - s.b) / s.tau) ** 2));
+    if (w < 1e-4) continue;
+    let v = s.v0;
+    if (s.v1) { const G = Math.max(0.06, 0.5 * (s.b - s.a)), f = smoothstep(0, 1, (t - s.b + G) / G); v = v.map((x, k) => M.lerp(x, s.v1[k], f)); }
+    for (let k = 0; k < 5; k++) num[k] += w * v[k];
+    den += w; if (s.kind === 'V') vw += w;
+  }
+  if (den < 1e-3) return [0, 0, 0, 0, 0];
+  const e = envS(t), f = LINES.some((L) => t >= L.t0 && t <= L.t1) ? smoothstep(0.45, 0.8, e) * (1 - Math.min(1, vw / 0.5)) : 0;
+  const g = gain * (0.8 + 0.4 * smoothstep(0.35, 0.95, e)) * (0.35 + 0.65 * smoothstep(0.03, 0.2, e));   // emphasis x voicing gate
+  return num.map((x, k) => M.lerp(x / den, FILL[k], f) * g);
+}
+// VRM viseme weights at t, capped; gain scales the whole mouth (0 = closed). The mouth leads the sound by 30 ms
+export function visemesAt(t, gain = 1) {
+  const m = [0, 0, 0, 0, 0];
+  if (gain > 0) for (let k = -2; k <= 2; k++) { const r = mouthRaw(t + 0.03 + k / 60, gain); for (let j = 0; j < 5; j++) m[j] += W5[k + 2] * r[j]; }
+  for (let j = 0; j < 5; j++) m[j] = Math.min(m[j], CAP[j]);
+  const s = Math.min(1, OPEN_MAX / Math.max(1e-6, m[0] + m[4] + 0.5 * m[3]));
+  return Object.fromEntries(VIS.map((k, j) => [k, m[j] * s]));
+}
+// 1 inside sung words, easing to 0 over ~0.6 s outside them: slow on purpose, so the eyes and smile it drives never
+// flutter per syllable
+export function activityAt(t) {
+  let a = 0;
+  const n = segsBefore(t + 1.2);
+  for (let j = Math.max(0, n - 120); j < n; j++) {
+    const s = SEG[j]; if (s.kind === 'R' || s.b < t - 1.2) continue;
+    a = Math.max(a, Math.exp(-((Math.max(0, s.a - t, t - s.b) / 0.35) ** 2)));
+  }
+  return a;
 }
 
 // seeded blinks every ~2.2-4.5 s; each lasts ~150 ms (fast close, slower open)

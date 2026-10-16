@@ -8,7 +8,8 @@
 <script type="module">
 // motion lab: the singer alone over a time range, as frames (tools/clip.mjs steps window.renderFrame(i)).
 // ?t0=40&t1=44&fps=30&w=1280&h=720&views=full,face,side&twin=1&dir=<urlencoded JSON>
-// dir: { poses: {name: w} | track: [[u, 'pose' | {pose: w}], ...] (film.js poseTrack), mood, sing, groove, head, legs, walk, ik, bones, lookAt }
+// dir: { poses: {name: w} | track: [[u, 'pose' | {pose: w}], ...] (film.js poseTrack), mood, sing, groove, sway, swayBeats, weight, stance,
+//   heel, head, legs, walk, ik, bones, lookAt }
 // The floor grid is there to judge foot sliding; the face panel tracks her head.
 import * as THREE from 'three';
 const M = await import('../lib/motion.js');

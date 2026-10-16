@@ -5,15 +5,18 @@
 // her X clip was. The twin under the floor is the same girl inverted: ink hair with ember tips, red-hot eyes.
 //
 // Everything is a pure function of time:
-//   - pose: normalized humanoid bones from a blend of named poses (POSES) + groove on the beat
-//   - face: VRM expressions (visemes from the vocal envelope + vowel, seeded blinks, moods)
+//   - pose: normalized humanoid bones from a blend of named poses (POSES) + the groove (her weight moving from
+//     leg to leg, knees giving on the beat) with the feet planted by leg IK; arms solved in root space (the same
+//     upright and mirrored), hands following late, hanging arms trailing the body
+//   - face: VRM expressions (visemes from the phones of the lyric words, seeded blinks, moods split into eye and
+//     mouth parts so no mood props the mouth open)
 //   - hair/skirt spring bones: replayed from rest over the last 0.3 s on every call (the springs are
 //     damped, so the start state is forgotten long before t: same t -> same hair, on any worker)
 //   - materials: three-vrm's MToon (toon ramp, shade colour, matcap rim, emission, outlines) with the film's own
 //     uniforms (rim, scan line, tint, lift, glow, dissolve, exploded view) spliced into its shader
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { VRMLoaderPlugin, VRMUtils, VRMExpression, VRMExpressionMorphTargetBind } from '@pixiv/three-vrm';
 import * as M from '../lib/motion.js';
 import * as P from './performance.js';
 
@@ -384,53 +387,125 @@ function accessories(vrm, look, U, hidden) {
 // FK values are XYZ euler radians per bone; fingers curl about z (left -, right +).
 // Arms can instead take an IK target: ik: { r: [x, y, z], l: [...] } in the character's own space
 // (feet at the origin, +Z forward), authored with the head bone at y = 1.39 and scaled to the model's own head
-// height at load; elbows toward an optional pole.
-const fingers = (side, open) => { // open: {Index: 0..1 extended, ..., Thumb, spread}
+// height at load. ik.frame ('head' | 'chest' | 'hips', or per side { r, l }) carries the target with that part of
+// her as it moves; the elbow goes toward ik.pole (authored for the right arm, mirrored for the left; poleL / poleR
+// set one side). still: 1 keeps hanging arms still (hands planted on something).
+const fingers = (side, open) => { // open: {Index: 0..1 extended, ..., Thumb, spread: index and middle apart}
   const s = side === 'l' ? -1 : 1, P = side === 'l' ? 'left' : 'right', o = {};
   for (const f of ['Index', 'Middle', 'Ring', 'Little']) {
     const k = 1 - (open[f] ?? 0);
     o[`${P}${f}Proximal`] = [0, 0, s * 1.25 * k]; o[`${P}${f}Intermediate`] = [0, 0, s * 1.5 * k]; o[`${P}${f}Distal`] = [0, 0, s * 0.9 * k];
   }
-  if (open.spread) { o[`${P}IndexProximal`][1] = -s * 0.2; o[`${P}MiddleProximal`][1] = s * 0.14; }
+  if (open.spread) { o[`${P}IndexProximal`][1] = s * 0.2; o[`${P}MiddleProximal`][1] = -s * 0.14; }
   const th = 1 - (open.Thumb ?? 0);
   o[`${P}ThumbMetacarpal`] = [0, -s * 0.5 * th, s * 0.35 * th]; o[`${P}ThumbProximal`] = [0, -s * 0.6 * th, 0]; o[`${P}ThumbDistal`] = [0, -s * 0.6 * th, 0];
   return o;
 };
 const curl = (side, k, thumb = 0.5) => fingers(side, { Index: 1 - k, Middle: 1 - k, Ring: 1 - k, Little: 1 - k, Thumb: 1 - thumb });
-const relaxL = curl('l', 0.35, 0.4), relaxR = curl('r', 0.35, 0.4);
 const fist = (s) => curl(s, 0.95, 0.85);
-const restL = { leftUpperArm: [0.05, 0, -1.22], leftLowerArm: [0, -0.25, 0], leftHand: [0, 0, -0.1], ...relaxL };
-const restR = { rightUpperArm: [0.05, 0, 1.22], rightLowerArm: [0, 0.25, 0], rightHand: [0, 0, 0.1], ...relaxR };
+// a hand at rest: the curl grows from index to little and the fingers fan a little; k scales it
+const relax = (side, k = 1) => {
+  const s = side === 'l' ? -1 : 1, P = side === 'l' ? 'left' : 'right', o = {};
+  const F = { Index: [0.22, 0.32, 0.18, -0.06], Middle: [0.32, 0.42, 0.22, 0], Ring: [0.42, 0.48, 0.26, 0.05], Little: [0.52, 0.52, 0.28, 0.12] };
+  for (const [f, [a, b, c, fan]] of Object.entries(F)) { o[`${P}${f}Proximal`] = [0, s * fan, s * a * k]; o[`${P}${f}Intermediate`] = [0, 0, s * b * k]; o[`${P}${f}Distal`] = [0, 0, s * c * k]; }
+  o[`${P}ThumbMetacarpal`] = [0, -s * 0.25 * k, s * 0.15 * k]; o[`${P}ThumbProximal`] = [0, -s * 0.3 * k, 0]; o[`${P}ThumbDistal`] = [0, -s * 0.25 * k, 0];
+  return o;
+};
+const OPEN = { Index: 0.92, Middle: 0.88, Ring: 0.8, Little: 0.72, Thumb: 0.75 }, V = { Index: 1, Middle: 1, spread: true, Thumb: 0.1 };
+// arms hang close (9 deg out, a little forward), elbows soft, palms to the thighs, shoulders down
+const restL = { leftUpperArm: [-0.08, -0.18, -1.37], leftLowerArm: [0, -0.3, 0], leftHand: [0.05, 0, -0.1], leftShoulder: [0, -0.02, -0.04], ...relax('l') };
+const restR = { rightUpperArm: [-0.08, 0.18, 1.37], rightLowerArm: [0, 0.3, 0], rightHand: [0.05, 0, 0.1], rightShoulder: [0, 0.02, 0.04], ...relax('r') };
+// the right fist holds the mic 5 cm under her lips and a little in front, aimed at them; it rides with her head
+const micR = { ik: { r: [-0.063, 1.284, 0.163], pole: [-0.6, -1, -0.737], frame: { r: 'head' } }, rightHand: [-0.263, -0.513, 0.425], ...fist('r'), mic: 1 };
+const hipL = { l: [0.151, 1.012, -0.015], poleL: [0.7, 0.1, -0.6] }, hipHandL = [-0.484, -0.125, 0.525];   // left palm on the waist
 export const POSES = {
   rest: { ...restL, ...restR },
-  // right fist holds the mic just under the chin; left arm loose
-  mic: { ...restL, ik: { r: [-0.05, 1.22, 0.2] }, rightHand: [0, 0.3, -0.6], ...fist('r'), mic: 1 },
+  mic: { ...restL, ...micR },
   // both hands on the mic, leaning in (the chorus belt)
-  belt: { spine: [0.1, 0, 0], ik: { r: [-0.04, 1.2, 0.22], l: [0.05, 1.15, 0.24] }, rightHand: [0, 0.3, -0.6], leftHand: [0, -0.4, 0.5], ...fist('r'), ...curl('l', 0.75, 0.6), mic: 1 },
-  // the mic thrown out to the side on a held note, free hand open
-  hold: { ik: { r: [-0.42, 1.45, 0.18], l: [0.38, 1.0, 0.28] }, rightHand: [0, 0.2, -0.4], ...fist('r'), leftHand: [-0.6, 0, 0], ...fingers('l', { Index: 0.9, Middle: 0.85, Ring: 0.8, Little: 0.75, Thumb: 0.8 }), mic: 1 },
-  point: { ...restL, ik: { r: [-0.2, 1.38, 0.62], pole: [-1, -0.3, -0.4] }, rightHand: [0, 0, 0], ...fingers('r', { Index: 1 }) },
-  peace: { ...restL, ik: { r: [-0.2, 1.42, 0.16] }, rightHand: [0, -0.3, 0.9], ...fingers('r', { Index: 1, Middle: 1, spread: true }) },
-  hips: { ik: { r: [-0.17, 0.95, 0.02], l: [0.17, 0.95, 0.02], pole: [-1, 0.1, -0.6] }, rightHand: [0, 0, -0.9], leftHand: [0, 0, 0.9], ...curl('l', 0.6, 0.3), ...curl('r', 0.6, 0.3) },
-  open: { leftUpperArm: [0.2, -0.45, -0.35], rightUpperArm: [0.2, 0.45, 0.35], leftLowerArm: [0, -0.35, 0], rightLowerArm: [0, 0.35, 0], leftHand: [-0.4, 0, 0], rightHand: [-0.4, 0, 0],
-    ...fingers('l', { Index: 0.85, Middle: 0.8, Ring: 0.75, Little: 0.7, Thumb: 0.7 }), ...fingers('r', { Index: 0.85, Middle: 0.8, Ring: 0.75, Little: 0.7, Thumb: 0.7 }) },
-  shrug: { leftShoulder: [0, 0, 0.18], rightShoulder: [0, 0, -0.18], ik: { r: [-0.36, 1.02, 0.25], l: [0.36, 1.02, 0.25] }, leftHand: [-1.1, 0, 0], rightHand: [-1.1, 0, 0],
-    ...fingers('l', { Index: 0.85, Middle: 0.85, Ring: 0.85, Little: 0.85, Thumb: 0.7 }), ...fingers('r', { Index: 0.85, Middle: 0.85, Ring: 0.85, Little: 0.85, Thumb: 0.7 }) },
-  yawn: { ...restL, ik: { r: [-0.02, 1.33, 0.13] }, rightHand: [0.2, -0.2, 1.35], ...fingers('r', { Index: 0.9, Middle: 0.9, Ring: 0.9, Little: 0.9, Thumb: 0.5 }) },
-  heart: { spine: [0.05, 0, 0], ik: { r: [-0.03, 1.2, 0.19], l: [0.03, 1.2, 0.19] }, leftHand: [0, 0.3, 0.6], rightHand: [0, -0.3, -0.6],
+  belt: { spine: [0.06, 0, 0], ik: { r: [-0.057, 1.292, 0.175], l: [0.046, 1.186, 0.231], frame: 'head' }, rightHand: [-0.238, -0.537, 0.612], leftHand: [-0.313, -0.338, 0.344], ...fist('r'), ...curl('l', 0.7, 0.6), mic: 1 },
+  // a held note: the mic stays at her mouth, the free arm goes out and up, palm forward
+  hold: { spine: [-0.04, 0, 0], ...micR, ik: { ...micR.ik, l: [0.442, 1.41, 0.227], poleL: [0.325, -1, 0], frame: { r: 'head', l: 'chest' } }, leftHand: [-0.484, 0, 0.375], leftShoulder: [0, 0, 0.06], ...fingers('l', OPEN) },
+  // still singing, the free hand gestures: a V by her temple, a point, on the hip, open, a yawn beside the mic, a reach
+  micPeace: { ...restL, ...micR, ik: { ...micR.ik, l: [0.167, 1.371, 0.114], poleL: [1.394, -0.7, 0.4], frame: 'head' }, leftHand: [0.531, 0.688, 0.347], ...fingers('l', V) },
+  micPoint: { ...restL, ...micR, ik: { ...micR.ik, l: [0.24, 1.296, 0.399], poleL: [1.131, -1, -0.081], frame: { r: 'head', l: 'chest' } }, leftHand: [-0.188, 0.109, -0.172], leftShoulder: [0, -0.07, 0.03], ...fingers('l', { Index: 1, Thumb: 0.3 }) },
+  micHip: { ...micR, ik: { ...micR.ik, ...hipL, frame: { r: 'head', l: 'hips' } }, leftHand: hipHandL, ...curl('l', 0.3, 0.2), leftShoulder: [0, 0.03, 0.03] },
+  micOpen: { ...micR, ik: { ...micR.ik, l: [0.402, 1.049, 0.203], poleL: [-0.394, -1, 0.219], frame: { r: 'head', l: 'chest' } }, leftHand: [-0.375, 0.047, 0.047], ...fingers('l', OPEN) },
+  micYawn: { ...restL, ...micR, ik: { ...micR.ik, l: [0.07, 1.34, 0.115], poleL: [0.412, -1, -0.862], frame: 'head' }, leftHand: [0.35, 0.9, -0.4], ...fingers('l', { Index: 0.85, Middle: 0.85, Ring: 0.8, Little: 0.75, Thumb: 0.6 }) },
+  micReach: { spine: [-0.04, 0, 0], ...micR, ik: { ...micR.ik, l: [0.261, 1.407, 0.444], poleL: [1.3, -1, 0.15], frame: { r: 'head', l: 'chest' } }, leftHand: [0, 0.125, 0.281], leftShoulder: [0, -0.1, 0.03],
+    ...fingers('l', { Index: 0.92, Middle: 0.85, Ring: 0.75, Little: 0.65, Thumb: 0.7, spread: true }) },
+  // the mic lowered to her chest, the free hand on the hip (between lines only)
+  micHips: { ik: { ...hipL, r: [-0.104, 1.131, 0.157], pole: [-0.162, -1, -0.737], frame: { l: 'hips', r: 'chest' } }, leftHand: hipHandL, rightHand: [-0.031, -0.903, 0.025], ...curl('l', 0.3, 0.2), ...fist('r'), leftShoulder: [0, 0.03, 0.03], mic: 1 },
+  // free-handed
+  point: { ...restL, ik: { r: [-0.199, 1.49, 0.399], pole: [-0.681, -1, -0.281], frame: 'chest' }, rightHand: [-0.172, -0.094, 0.125], rightShoulder: [0, 0.08, -0.04], ...fingers('r', { Index: 1, Thumb: 0.3 }) },
+  peace: { ...restL, ik: { r: [-0.154, 1.36, 0.08], pole: [-1.844, -0.831, 0.4], frame: 'head' }, rightHand: [0.625, -0.859, -0.238], ...fingers('r', V) },
+  hips: { ik: { l: hipL.l, r: [-0.151, 1.012, -0.015], pole: [-0.7, 0.1, -0.6], frame: 'hips' }, leftHand: hipHandL, rightHand: [-0.484, 0.125, -0.525], ...curl('l', 0.3, 0.2), ...curl('r', 0.3, 0.2), leftShoulder: [0, 0.03, 0.03], rightShoulder: [0, -0.03, -0.03] },
+  open: { ik: { l: [0.402, 1.049, 0.203], r: [-0.402, 1.049, 0.203], pole: [0.394, -1, 0.219], frame: 'chest' }, leftHand: [-0.375, 0.047, 0.047], rightHand: [-0.375, -0.047, -0.047], ...fingers('l', OPEN), ...fingers('r', OPEN) },
+  shrug: { ik: { l: [0.229, 1.134, 0.239], r: [-0.229, 1.134, 0.239], pole: [0.188, -1, -0.231], frame: 'chest' }, leftHand: [-1.453, 0, 0.219], rightHand: [-1.453, 0, -0.219], leftShoulder: [0, 0, 0.15], rightShoulder: [0, 0, -0.15], ...fingers('l', OPEN), ...fingers('r', OPEN) },
+  yawn: { ...restL, ik: { r: [0.002, 1.356, 0.131], pole: [-0.412, -1, -0.862], frame: 'head' }, rightHand: [-0.394, -0.778, 0.425], ...fingers('r', { Index: 0.85, Middle: 0.85, Ring: 0.8, Little: 0.75, Thumb: 0.6 }) },
+  heart: { spine: [0.05, 0, 0], ik: { l: [0.026, 1.19, 0.17], r: [-0.026, 1.19, 0.17], pole: [-0.806, -1, -0.962], frame: 'chest' }, leftHand: [0.359, 0.034, 0.444], rightHand: [0.359, -0.034, -0.444],
     ...fingers('l', { Index: 0.6, Middle: 0.5, Ring: 0.4, Little: 0.3, Thumb: 0.5 }), ...fingers('r', { Index: 0.6, Middle: 0.5, Ring: 0.4, Little: 0.3, Thumb: 0.5 }) },
-  reach: { spine: [-0.04, 0, 0], ...restL, ik: { r: [-0.16, 1.3, 0.66], pole: [-1, -0.5, -0.2] }, rightHand: [-0.3, 0, 0.2], ...fingers('r', { Index: 0.8, Middle: 0.7, Ring: 0.6, Little: 0.5, Thumb: 0.6 }) },
-  float: { spine: [-0.06, 0, 0], leftUpperArm: [0.15, -0.2, -0.75], rightUpperArm: [0.15, 0.2, 0.75], leftLowerArm: [0, -0.5, 0], rightLowerArm: [0, 0.5, 0], leftHand: [-0.2, 0, -0.2], rightHand: [-0.2, 0, 0.2],
-    ...curl('l', 0.25, 0.3), ...curl('r', 0.25, 0.3), leftUpperLeg: [-0.15, 0, 0.04], rightUpperLeg: [0.25, 0, -0.04], leftLowerLeg: [0.55, 0, 0], rightLowerLeg: [0.3, 0, 0] },
+  reach: { spine: [-0.04, 0, 0], ...restL, ik: { r: [-0.261, 1.407, 0.444], pole: [-1.3, -1, 0.15], frame: 'chest' }, rightHand: [0, -0.125, -0.281], rightShoulder: [0, 0.1, -0.03],
+    ...fingers('r', { Index: 0.92, Middle: 0.85, Ring: 0.75, Little: 0.65, Thumb: 0.7, spread: true }) },
+  float: { spine: [-0.06, 0, 0], leftUpperArm: [0.15, -0.2, -0.75], rightUpperArm: [0.15, 0.2, 0.75], leftLowerArm: [0, -0.6, 0], rightLowerArm: [0, 0.6, 0], leftHand: [-0.2, 0, -0.2], rightHand: [-0.2, 0, 0.2],
+    ...relax('l', 0.8), ...relax('r', 0.8), leftUpperLeg: [-0.15, 0, 0.04], rightUpperLeg: [0.25, 0, -0.04], leftLowerLeg: [0.55, 0, 0], rightLowerLeg: [0.3, 0, 0] },
   sit: { spine: [0.1, 0, 0], leftUpperLeg: [-1.45, 0, 0.06], rightUpperLeg: [-1.4, 0, -0.06], leftLowerLeg: [1.35, 0, 0], rightLowerLeg: [1.5, 0, 0], leftFoot: [0.1, 0, 0], rightFoot: [0.1, 0, 0],
-    leftUpperArm: [0.3, -0.3, -1.25], rightUpperArm: [0.3, 0.3, 1.25], leftLowerArm: [0, -0.5, 0], rightLowerArm: [0, 0.5, 0], ...relaxL, ...relaxR },
+    leftUpperArm: [0.3, -0.3, -1.25], rightUpperArm: [0.3, 0.3, 1.25], leftLowerArm: [0, -0.5, 0], rightLowerArm: [0, 0.5, 0], ...relax('l'), ...relax('r'), still: 1 },
   hush: { ...restL, ik: { r: [-0.01, 1.32, 0.15] }, rightHand: [0, -0.4, 1.4], ...fingers('r', { Index: 1 }) },
   think: { ik: { r: [-0.04, 1.27, 0.12], l: [0.08, 1.08, 0.14], pole: [-0.6, -1, -0.2] }, rightHand: [0, 0, 1.2], leftHand: [0, 0, 0.6], ...curl('l', 0.6, 0.4), ...fingers('r', { Index: 0.6, Thumb: 0.7 }) },
 };
-const _e = new THREE.Euler(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
-const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3(), _m1 = new THREE.Matrix4(), _m2 = new THREE.Matrix4();
-const ARM = new Set(['leftUpperArm', 'leftLowerArm', 'rightUpperArm', 'rightLowerArm']);
-const BONES = [...new Set(Object.values(POSES).flatMap((p) => Object.keys(p)).filter((k) => k !== 'ik' && k !== 'mic').concat(['hips', 'spine', 'chest', 'upperChest', 'neck', 'head', 'leftShoulder', 'rightShoulder', 'leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'leftUpperLeg', 'rightUpperLeg', 'leftLowerLeg', 'rightLowerLeg', 'leftFoot', 'rightFoot']))];
+const _e = new THREE.Euler(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3(), _m1 = new THREE.Matrix4();
+const ARM = new Set(['leftUpperArm', 'leftLowerArm', 'rightUpperArm', 'rightLowerArm', 'leftHand', 'rightHand']);
+const FINGER = /Thumb|Index|Middle|Ring|Little/;
+const BONES = [...new Set(Object.values(POSES).flatMap((p) => Object.keys(p)).filter((k) => !['ik', 'mic', 'still'].includes(k)).concat(['hips', 'spine', 'chest', 'upperChest', 'neck', 'head', 'leftShoulder', 'rightShoulder', 'leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'leftUpperLeg', 'rightUpperLeg', 'leftLowerLeg', 'rightLowerLeg', 'leftFoot', 'rightFoot', 'leftToes', 'rightToes']))];
+
+// dir.poses is {name: w}, or a spring track's {w, signed} (signed: the springs' small overshoot, read only by the arm
+// direction so a move can carry a hair past its key). Everything else reads the clamped weights, summing to 1
+function weightsOf(poses = { rest: 1 }) {
+  const w = poses.w || poses, wn = {};
+  let sum = 0; for (const k of Object.values(w)) if (k > 0) sum += k;
+  if (!sum) return weightsOf({ rest: 1 });
+  for (const [n, k] of Object.entries(w)) if (k > 0) wn[n] = k / sum;
+  return { wn, ent: Object.entries(wn), signed: Object.entries(poses.signed || w).filter(([, k]) => k > -0.25 && Math.abs(k) > 1e-4) };
+}
+// ------------------------------------------------------------------ the groove (pure functions of t, u, dir)
+const sh3 = (x) => x * (1.5 - 0.5 * x * x);   // dwells at the ends
+// her weight, -1 all on the right leg .. +1 all on the left. On the groove it lands on a leg every swayBeats / 2
+// beats; off it, it drifts slowly about the contrapposto (dir.weight). dir.sway scales the shift and the drift
+function weightAt(t, u, dir) {
+  const g = dir.groove ?? 1, rest = dir.weight ?? -0.55;
+  const beat = sh3(Math.cos((M.TAU * (u - (dir.swayPhase ?? 0))) / (dir.swayBeats ?? 4)));
+  return M.clamp(rest + (dir.sway ?? 1) * ((beat - rest) * g + 0.2 * (1 - g) * M.noise1(t * 0.21, 31)), -1, 1);
+}
+// the knees give on the beat: 0..1 times the groove
+const dipAt = (u, dir) => (dir.groove ?? 1) * (0.5 + 0.5 * Math.cos(M.TAU * u)) ** 1.5;
+// the torso's groove at (t, u), the one source for the pose and the arms' lag: the hips over the standing leg (the
+// free hip forward), the chest rolling back so the shoulders stay level and the head upright, the dip on the beat,
+// breath, the head's idle. s: the weight, gated to standing poses by ws (sit, float, walk and legs: false keep their own)
+function addsAt(t, u, dir) {
+  const { wn } = weightsOf(dir.poses);
+  const ws = dir.walk != null || dir.legs === false ? 0 : M.clamp(1 - (wn.sit || 0) - (wn.float || 0));
+  const s = weightAt(t, u, dir) * ws, s1 = weightAt(t, u - 0.12, dir) * ws, s2 = weightAt(t, u - 0.25, dir) * ws;
+  const dip = dipAt(u, dir), breath = 0.012 * Math.sin((M.TAU * t) / 3.6);
+  const h = P.headAt(t, u), hb = dir.head || [0, 0, 0];
+  const add = {
+    hips: [0.015 * dip * ws, 0.05 * s + (dir.hipsYaw || 0), 0.065 * s],
+    spine: [0.02 * dip + (dir.lean || 0), -0.025 * s1, -0.015 * s1],
+    chest: [0.01 * dip + breath, -0.02 * s1, -0.03 * s1],
+    upperChest: [0.5 * breath, 0, -0.012 * s1],
+    neck: [h.pitch * 0.5, h.yaw * 0.4, h.roll * 0.4 + 0.015 * s2],
+    head: [h.pitch * 0.8 + hb[0] - 0.015 * dip, h.yaw * 0.8 + hb[1], h.roll * 0.8 + hb[2] + 0.025 * s2],
+    leftShoulder: [0, 0, -0.025 * dip - 0.3 * breath], rightShoulder: [0, 0, 0.025 * dip + 0.3 * breath],
+  };
+  if (dir.walk != null) {
+    const ph = dir.walk * M.TAU, sw = 0.42;
+    add.leftUpperLeg = [-sw * Math.sin(ph), 0, 0.02]; add.rightUpperLeg = [sw * Math.sin(ph), 0, -0.02];
+    add.leftLowerLeg = [0.5 * Math.max(0, Math.sin(ph + 1.6)) + 0.08, 0, 0]; add.rightLowerLeg = [0.5 * Math.max(0, Math.sin(ph + 1.6 + Math.PI)) + 0.08, 0, 0];
+    add.leftFoot = [0.15 * Math.sin(ph), 0, 0]; add.rightFoot = [-0.15 * Math.sin(ph), 0, 0];
+    add.hips = [0, 0.08 * Math.sin(ph), 0]; add.spine = [0.04, -0.06 * Math.sin(ph), 0];
+  }
+  return { add, s, dip, ws };
+}
 
 // the mic: ivory body, clay band, slate grille (held in the right fist; normalized hand frame)
 function makeMic(U) {
@@ -441,6 +516,37 @@ function makeMic(U) {
   g.add(body, band, head);
   return g;
 }
+
+// ------------------------------------------------------------------ face
+// VRoid's Joy / Sorrow / Surprised each bind one combined morph (Fcl_ALL_*) that opens the mouth: their eye and mouth
+// halves become expressions of their own, so a mood never props the mouth open while she sings. Registered as
+// expressions (never written to morphTargetInfluences) so expressionManager.update() clears them every frame
+const FACE_RAW = { eyeJoy: 'Fcl_EYE_Joy', mthFun: 'Fcl_MTH_Fun', mthJoy: 'Fcl_MTH_Joy', eyeSorrow: 'Fcl_EYE_Sorrow', mthSorrow: 'Fcl_MTH_Sorrow',
+  eyeSurprised: 'Fcl_EYE_Surprised', mthSurprised: 'Fcl_MTH_Surprised' };
+function registerRawFace(vrm, json) {
+  // the morph names are only in the glTF (three.js keys the face's morphs '0'..'40'); the face primitives are the
+  // visemes' own (Facebaked...), else every mesh with that many morphs
+  const g = json.extensions?.VRM?.blendShapeMaster?.blendShapeGroups?.find((b) => b.presetName === 'a');
+  const names = g && json.meshes[g.binds[0].mesh].primitives[0].extras?.targetNames;
+  if (!names) return [];
+  const em = vrm.expressionManager, prims = em.getExpression('aa')?.binds[0]?.primitives || [];
+  if (!prims.length) vrm.scene.traverse((o) => { if (o.morphTargetInfluences?.length === names.length) prims.push(o); });
+  const got = [];
+  for (const [name, morph] of Object.entries(FACE_RAW)) {
+    const index = names.findIndex((n) => n.endsWith(morph));
+    if (index < 0 || !prims.length) continue;
+    const e = new VRMExpression(name);
+    e.addBind(new VRMExpressionMorphTargetBind({ primitives: prims, index, weight: 1 }));
+    vrm.scene.add(e); em.registerExpression(e); got.push(name);
+  }
+  return got;
+}
+// dir.mouth = [open, wide, round] (lab sheets): fixed visemes on the same scale as performance.js visemesAt
+const legacyMouth = ([open, wide = 0.2, round = 0]) => {
+  const o = M.clamp(open) * 0.6;
+  return { aa: o * M.clamp(1 - round - 0.6 * wide), oh: o * round * 0.75, ou: o * round * 0.5, ee: o * wide * 0.7, ih: o * wide * 0.5 };
+};
+const HEAD_H = 0.22;   // her head, chin to crown (m)
 
 // ------------------------------------------------------------------ the singer
 const OLD_HEAD_Y = 1.39;   // POSES' IK targets were authored on a model whose head bone sat here
@@ -477,34 +583,65 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
   const eyeY = eyeL.y, eyeX = Math.abs(eyeL.x - eyeR.x) / 2, eyeZ = (eyeL.z + eyeR.z) / 2;
   const K = headY / OLD_HEAD_Y;    // IK targets scale with her
   const acc = accessories(vrm, look, U, hidden);
-  // arm rest geometry for the IK in the model's own frame (where normalized bones rest at identity)
+  // root-relative position / rotation of a node: det > 0 even when she hangs under a mirrored group (the twin), so
+  // every solve below gives the same pose upright and mirrored
+  const _mi = new THREE.Matrix4(), _mr = new THREE.Matrix4(), _ms = new THREE.Vector3(), _rp = new THREE.Vector3(), _rq = new THREE.Quaternion();
+  const rootRel = (n, outP = _rp, outQ = _rq) => { _mr.multiplyMatrices(_mi.copy(root.matrixWorld).invert(), n.matrixWorld).decompose(outP, outQ, _ms); return outP; };
+  // arm rest geometry: limb lengths in root units (the targets' own), the rest basis in the model's own frame (where
+  // normalized bones rest at identity)
   const armRest = {};
   for (const side of ['left', 'right']) {
     const loc = (n) => vrm.scene.worldToLocal(n.getWorldPosition(new THREE.Vector3()));
-    const a = loc(nodes[side + 'UpperArm']), b = loc(nodes[side + 'LowerArm']), c = loc(nodes[side + 'Hand']);
+    const a = loc(nodes[side + 'UpperArm']), b = loc(nodes[side + 'LowerArm']);
     const dir0 = b.clone().sub(a).normalize();
     const axis0 = new THREE.Vector3(0, side === 'left' ? -1 : 1, 0); axis0.sub(dir0.clone().multiplyScalar(axis0.dot(dir0))).normalize();
-    armRest[side] = { la: a.distanceTo(b), lb: b.distanceTo(c), B0inv: new THREE.Matrix4().makeBasis(dir0, axis0, dir0.clone().cross(axis0)).invert() };
+    const [S, E, W] = ['UpperArm', 'LowerArm', 'Hand'].map((k) => rootRel(nodes[side + k]).clone());
+    armRest[side] = { la: S.distanceTo(E), lb: E.distanceTo(W), B0inv: new THREE.Matrix4().makeBasis(dir0, axis0, dir0.clone().cross(axis0)).invert() };
   }
+  // body frames: an IK target rides with her head, chest or hips as they move from rest (the T-pose here)
+  const FRAMES = { head: nodes.head, chest: nodes.upperChest || nodes.chest, hips: nodes.hips };
+  const frame = { root: { p: new THREE.Vector3(), d: new THREE.Quaternion(), p0: new THREE.Vector3() } };
+  for (const [f, n] of Object.entries(FRAMES)) frame[f] = { p: new THREE.Vector3(), d: new THREE.Quaternion(), p0: rootRel(n).clone(), q0i: _rq.clone().invert() };
+  // the torso bones and how far under the shoulders each one pivots (m)
+  const TORSO = ['hips', 'spine', 'chest', 'upperChest'].filter((b) => nodes[b]);
+  const shY = rootRel(nodes.leftUpperArm).y, LEVER = TORSO.map((b) => shY - rootRel(nodes[b]).y);
+  // leg rest geometry in the MODEL frame (vrm.scene local: normalized bones rest at identity, nothing mirrored);
+  // character-space directions, points and rotations convert into it
+  const sc = vrm.scene.scale.x, qSc = vrm.scene.quaternion.clone(), qScI = qSc.clone().invert();
+  const c2mV = (v) => v.applyQuaternion(qScI), c2mP = (v) => v.applyQuaternion(qScI).divideScalar(sc), cq2m = (q) => q.premultiply(qScI).multiply(qSc);
+  const fwdM = c2mV(new THREE.Vector3(0, 0, 1)), legRest = {}, leg = {};
+  for (const side of ['left', 'right']) {
+    const oL = nodes[side + 'LowerLeg'].position.clone(), oF = nodes[side + 'Foot'].position.clone();
+    const dL = oL.clone().normalize(), f0 = fwdM.clone().addScaledVector(dL, -fwdM.dot(dL)).normalize();
+    const ankle = rootRel(nodes[side + 'Foot']).clone();
+    const ball = nodes[side + 'Toes'] ? rootRel(nodes[side + 'Toes']).clone().sub(ankle) : new THREE.Vector3(0, -0.063, 0.108);
+    legRest[side] = { oU: nodes[side + 'UpperLeg'].position.clone(), la: oL.length(), lb: oF.length(), dF: oF.normalize(), ankle, ball,
+      B0inv: new THREE.Matrix4().makeBasis(dL, f0, dL.clone().cross(f0)).invert() };
+    leg[side] = { A: new THREE.Vector3(), pole: new THREE.Vector3(), qF: new THREE.Quaternion(), qY: new THREE.Quaternion() };
+  }
+  // the stance (character space): ankle x, ankle z from rest, toe-out; feet 12 cm apart, her left a touch forward
+  const STANCE = { left: { x: 0.064, z: 0.025, yaw: 0.2 }, right: { x: -0.06, z: -0.012, yaw: -0.1 } };
   const mic = makeMic(U); nodes.rightHand.add(mic);
   mic.position.set(-0.055 * FX, -0.025, 0.0); mic.rotation.set(FX * Math.PI / 2, 0, 0);
   const springs = vrm.springBoneManager;
   const cons = vrm.nodeConstraintManager;
   springs?.setInitState();
   const em = vrm.expressionManager;
-  // VRM 0 customs keep their own names (Shino: "Surprised", "Extra" = the > < squint)
+  // VRM 0 customs keep their own names (Shino: "Extra" = the > < squint). happy / sad / surprised (VRoid's open-mouthed
+  // Joy / Sorrow / Surprised) are retired for the raw eye and mouth halves
   const EXPR = {};
-  for (const n of ['aa', 'ih', 'ou', 'ee', 'oh', 'happy', 'angry', 'sad', 'relaxed', 'surprised', 'blink', 'blinkLeft', 'blinkRight', 'neutral', 'extra']) {
+  for (const n of ['aa', 'ih', 'ou', 'ee', 'oh', 'angry', 'relaxed', 'blink', 'blinkLeft', 'extra']) {
     const hit = [n, n[0].toUpperCase() + n.slice(1)].find((k) => em.getExpression(k));
     if (hit) EXPR[n] = hit;
   }
+  for (const n of registerRawFace(vrm, gltf.parser.json)) EXPR[n] = n;
   const setX = (n, v) => { if (EXPR[n]) em.setValue(EXPR[n], v); };
 
-  // two-bone IK: local quaternions for upper + lower arm that put the wrist on target (world)
+  // two-bone arm IK in root space: local quaternions for upper + lower arm that put the wrist on T, elbow toward pole
   function solveArm(side, T, pole, outU, outL) {
     const up = nodes[side + 'UpperArm'], R = armRest[side];
-    up.parent.updateWorldMatrix(true, false);
-    const S = up.getWorldPosition(_v1);
+    up.updateWorldMatrix(true, false);
+    const S = rootRel(up, _v1);
     const toT = _v2.copy(T).sub(S);
     let d = toT.length(); const dST = toT.normalize();
     d = M.clamp(d, Math.abs(R.la - R.lb) + 1e-3, R.la + R.lb - 1e-3);
@@ -518,119 +655,230 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
     if (n.lengthSq() < 1e-8) n.copy(pp).cross(dir);
     n.normalize();
     const beta = Math.acos(M.clamp(dir.dot(fdir), -1, 1));
-    // world rotation of the bone = current basis * rest basis^-1 (rest basis in the bone's own rest frame)
+    // root rotation of the bone = current basis * rest basis^-1 (rest basis in the bone's own rest frame)
     _m1.makeBasis(dir, n, dir.clone().cross(n)).multiply(R.B0inv);
     _q.setFromRotationMatrix(_m1);
-    up.parent.getWorldQuaternion(_q2);
+    rootRel(up.parent, _v2, _q2);
     outU.copy(_q2.invert().multiply(_q));
     outL.setFromAxisAngle(_v1.set(0, side === 'left' ? -1 : 1, 0), beta);
   }
-  const qBlend = {}, qTmpU = new THREE.Quaternion(), qTmpL = new THREE.Quaternion(), _T = new THREE.Vector3(), _Pole = new THREE.Vector3();
+  // two-bone leg IK in the model frame: thigh, shin and foot local quaternions that put the ankle on A, the knee toward
+  // pole and the foot at model-frame orientation qFoot
+  const _lh = new THREE.Vector3(), _ld = new THREE.Vector3(), _lp = new THREE.Vector3(), _lk = new THREE.Vector3(), _lu = new THREE.Vector3(), _lf = new THREE.Vector3(), _lq = new THREE.Quaternion();
+  function solveLeg(side, A, pole, qFoot, outU, outL, outF) {
+    const R = legRest[side], qH = nodes.hips.quaternion;
+    const H = _lh.copy(R.oU).applyQuaternion(qH).add(nodes.hips.position);
+    const dir = _ld.copy(A).sub(H); let d = dir.length(); dir.divideScalar(d);
+    const L = R.la + R.lb, ds = 0.995 * L;
+    if (d > ds) d = ds + (L - ds) * (1 - Math.exp(-(d - ds) / (L - ds)));   // soft reach: no knee snap near straight
+    d = Math.max(d, Math.abs(R.la - R.lb) + 1e-3);
+    const x = (R.la * R.la - R.lb * R.lb + d * d) / (2 * d), h = Math.sqrt(Math.max(0, R.la * R.la - x * x));
+    const pp = _lp.copy(pole).addScaledVector(dir, -pole.dot(dir)).normalize();
+    const Kn = _lk.copy(H).addScaledVector(dir, x).addScaledVector(pp, h);
+    const dU = _lu.copy(Kn).sub(H).normalize(), fU = _lf.copy(pp).addScaledVector(dU, -pp.dot(dU)).normalize();
+    _m1.makeBasis(dU, fU, dU.clone().cross(fU)).multiply(R.B0inv);
+    _lq.setFromRotationMatrix(_m1);                                      // the thigh, model frame
+    outU.copy(qH).invert().multiply(_lq);
+    outL.setFromUnitVectors(R.dF, H.addScaledVector(dir, d).sub(Kn).normalize().applyQuaternion(_lq.invert()));
+    outF.copy(_lq.invert()).multiply(outL).invert().multiply(qFoot);
+  }
   const eul = (x, y, z) => _e.set(x * FX, y, z * FX, 'XYZ');
-  // pose at time t: blend of poses + groove; every bone set (pure)
-  function applyPose(t, u, dir) {
-    const w = dir.poses || { rest: 1 };
-    const entries = Object.entries(w).filter(([, k]) => k > 0);
-    const wsum = entries.reduce((a, [, k]) => a + k, 0) || 1;
-    const g = dir.groove ?? 1, bt = (u % 1 + 1) % 1;
-    const bounce = Math.pow(Math.sin(Math.PI * bt), 2);          // up on the off-beat
-    const sway = Math.sin(Math.PI * u);                           // side to side over two beats
-    const h = P.headAt(t, u);
-    const hb = dir.head || [0, 0, 0];
-    const add = {
-      hips: [0, 0.05 * g * sway * 0.6 + (dir.hipsYaw || 0), 0.035 * g * sway],
-      spine: [0.02 * g * bounce + (dir.lean || 0), -0.03 * g * sway, -0.02 * g * sway],
-      chest: [0.015 * g * bounce, 0, 0],
-      neck: [h.pitch * 0.5, h.yaw * 0.4, h.roll * 0.4],
-      head: [h.pitch * 0.8 + hb[0] - 0.02 * g * bounce, h.yaw * 0.8 + hb[1], h.roll * 0.8 + hb[2] + 0.03 * g * sway],
-      leftShoulder: [0, 0, -0.03 * g * bounce], rightShoulder: [0, 0, 0.03 * g * bounce],
-    };
-    if (dir.walk != null) {
-      const ph = dir.walk * M.TAU, sw = 0.42;
-      add.leftUpperLeg = [-sw * Math.sin(ph), 0, 0.02]; add.rightUpperLeg = [sw * Math.sin(ph), 0, -0.02];
-      add.leftLowerLeg = [0.5 * Math.max(0, Math.sin(ph + 1.6)) + 0.08, 0, 0]; add.rightLowerLeg = [0.5 * Math.max(0, Math.sin(ph + 1.6 + Math.PI)) + 0.08, 0, 0];
-      add.leftFoot = [0.15 * Math.sin(ph), 0, 0]; add.rightFoot = [-0.15 * Math.sin(ph), 0, 0];
-      add.hips = [0, 0.08 * Math.sin(ph), 0]; add.spine = [0.04, -0.06 * Math.sin(ph), 0];
-      dir = { ...dir, bones: { ...(dir.bones || {}), leftUpperArm: [0, 0.35 * Math.sin(ph), 0], rightUpperArm: [0, 0.35 * Math.sin(ph), 0] } };
-    } else if (dir.legs !== false) {
-      add.leftUpperLeg = [-0.05 * g * bounce, 0, 0.02]; add.rightUpperLeg = [-0.05 * g * bounce, 0, -0.02];
-      add.leftLowerLeg = [0.1 * g * bounce, 0, 0]; add.rightLowerLeg = [0.1 * g * bounce, 0, 0];
-      add.leftFoot = [-0.05 * g * bounce, 0, 0]; add.rightFoot = [-0.05 * g * bounce, 0, 0];
+  const ZERO = [0, 0, 0], QI = new THREE.Quaternion(), _X = new THREE.Vector3(1, 0, 0), _Y = new THREE.Vector3(0, 1, 0);
+  const qLU = new THREE.Quaternion(), qLL = new THREE.Quaternion(), qLF = new THREE.Quaternion(), qHU = new THREE.Quaternion(), qHL = new THREE.Quaternion(), _hq = new THREE.Quaternion();
+  const _S = new THREE.Vector3(), _T = new THREE.Vector3(), _W = new THREE.Vector3(), _Eb = new THREE.Vector3(), _a = new THREE.Vector3(), _e2 = new THREE.Vector3(), _dS = new THREE.Vector3(), _eS = new THREE.Vector3();
+  // planted feet: two-bone IK onto the stance, the free heel peeling up about the ball of the foot, knees over the
+  // toes (a touch inward); blended in by ws so a crossfade to a pose with its own legs (sit, float) stays continuous
+  function plantLegs(s, ws, dir) {
+    for (const side of ['left', 'right']) {
+      const st = { ...STANCE[side], ...dir.stance?.[side] }, R = legRest[side], L = leg[side], sg = side === 'left' ? 1 : -1;
+      const fr = M.clamp((M.clamp(-sg * s) - 0.25) / 0.75), th = (dir.heel ?? 0.085) * fr * fr * (3 - 2 * fr);
+      L.qY.setFromAxisAngle(_Y, st.yaw); L.qF.setFromAxisAngle(_X, th).premultiply(L.qY);
+      c2mP(L.A.set(st.x, R.ankle.y, R.ankle.z + st.z).add(_v1.copy(R.ball).applyQuaternion(L.qY)).sub(_v1.copy(R.ball).applyQuaternion(L.qF)));
+      c2mV(L.pole.set(Math.sin(st.yaw * 0.5 - sg * 0.12), -0.05, Math.cos(st.yaw * 0.5 - sg * 0.12)));
+      cq2m(L.qF); cq2m(L.qY);
     }
-    // 1. every non-arm bone: weighted euler blend (small angles) + groove + per-shot offsets
+    // the knees never lock: a leg asked for more than 0.998 of its reach brings the hips down (a soft max)
+    let ex = -1;
+    for (const side of ['left', 'right']) {
+      const R = legRest[side];
+      ex = Math.max(ex, _v1.copy(R.oU).applyQuaternion(nodes.hips.quaternion).add(nodes.hips.position).distanceTo(leg[side].A) - 0.998 * (R.la + R.lb));
+    }
+    nodes.hips.position.y -= 0.002 * Math.log1p(Math.exp(ex / 0.002)) * ws;
+    for (const side of ['left', 'right']) {
+      const L = leg[side];
+      solveLeg(side, L.A, L.pole, L.qF, qLU, qLL, qLF);
+      nodes[side + 'UpperLeg'].quaternion.slerp(qLU, ws); nodes[side + 'LowerLeg'].quaternion.slerp(qLL, ws); nodes[side + 'Foot'].quaternion.slerp(qLF, ws);
+      nodes[side + 'Toes']?.quaternion.slerp(L.qF.invert().multiply(L.qY), ws);   // toes flat on the floor
+    }
+  }
+  // the torso at (t, u, dir): summed pitch / roll of hips..upperChest (VRM1 frame), how far they and the hips' shift
+  // carry the shoulders (character space), and the weight: what a hanging arm lags behind
+  function torsoAt(t, u, dir) {
+    const { ent } = weightsOf(dir.poses), { add, s } = addsAt(t, u, dir), o = { x: 0, z: 0, px: 0.036 * s, pz: 0, s };
+    TORSO.forEach((b, i) => {
+      let x = (add[b] || ZERO)[0] + (dir.bones?.[b] || ZERO)[0], z = (add[b] || ZERO)[2] + (dir.bones?.[b] || ZERO)[2];
+      for (const [name, k] of ent) { const v = POSES[name]?.[b] || POSES.rest[b] || ZERO; x += v[0] * k; z += v[2] * k; }
+      o.x += x; o.z += z; o.px -= LEVER[i] * z; o.pz += LEVER[i] * x;
+    });
+    return o;
+  }
+  const frameOf = (p, lr) => (typeof p.ik?.frame === 'string' ? p.ik.frame : p.ik?.frame?.[lr]) || 'root';
+  const poleOf = (p, lr, out) => {   // authored for the right arm, mirrored for the left unless poleL is given
+    const pl = p.ik?.[lr === 'l' ? 'poleL' : 'poleR'] || p.ik?.pole || [-0.5, -1, -0.45];
+    return out.set(lr === 'l' && !p.ik?.poleL ? -pl[0] : pl[0], pl[1], pl[2]);
+  };
+  // a pose's FK arm (rest's where it has none), its world matrices brought up to date
+  function fkArm(side, p) {
+    const kU = side + 'UpperArm', kL = side + 'LowerArm', vu = p[kU] || POSES.rest[kU], vl = p[kL] || POSES.rest[kL];
+    nodes[kU].quaternion.setFromEuler(eul(vu[0], vu[1], vu[2])); nodes[kL].quaternion.setFromEuler(eul(vl[0], vl[1], vl[2]));
+    for (const k of [kU, kL, side + 'Hand']) nodes[k].updateWorldMatrix(false, false);
+  }
+  // unit vector acc slerped toward unit vector a by f (f may stray a little outside 0..1)
+  const slerpV = (acc, a, f) => {
+    const ang = Math.acos(M.clamp(acc.dot(a), -1, 1)), sn = Math.sin(ang);
+    return sn < 1e-4 ? acc : acc.multiplyScalar(Math.sin((1 - f) * ang) / sn).addScaledVector(a, Math.sin(f * ang) / sn).normalize();
+  };
+  // pose at time t: blend of poses + the groove + planted legs + arms; every bone set (pure). at(t') is the direction
+  // at another time: the hands follow the arms late and hanging arms lag the torso
+  function applyPose(t, u, dir, at) {
+    const { wn, ent, signed } = weightsOf(dir.poses), entH = weightsOf(at(t - 0.07).poses).ent;
+    const { add, s, dip, ws } = addsAt(t, u, dir);
+    if (dir.walk != null) { const sw = 0.35 * Math.sin(dir.walk * M.TAU); dir = { ...dir, bones: { ...(dir.bones || {}), leftUpperArm: [0, sw, 0], rightUpperArm: [0, sw, 0] } }; }
+    // 1. every bone but the arms: weighted euler blend (small angles) + groove + per-shot offsets; fingers on the
+    // hands' late weights
     for (const b of BONES) {
-      if (ARM.has(b)) continue;
-      const n = nodes[b]; if (!n) continue;
+      const n = nodes[b]; if (!n || ARM.has(b)) continue;
       let x = 0, y = 0, z = 0;
-      for (const [name, k] of entries) {
-        const v = (POSES[name] || {})[b] || POSES.rest[b] || [0, 0, 0];
+      for (const [name, k] of FINGER.test(b) ? entH : ent) {
+        const v = POSES[name]?.[b] || POSES.rest[b] || ZERO;
         x += v[0] * k; y += v[1] * k; z += v[2] * k;
       }
-      const d = add[b] || [0, 0, 0], o = dir.bones?.[b] || [0, 0, 0];
-      n.quaternion.setFromEuler(eul(x / wsum + d[0] + o[0], y / wsum + d[1] + o[1], z / wsum + d[2] + o[2]));
+      const d = add[b] || ZERO, o = dir.bones?.[b] || ZERO;
+      n.quaternion.setFromEuler(eul(x + d[0] + o[0], y + d[1] + o[1], z + d[2] + o[2]));
     }
+    // the hips over the standing leg and down on the dip (character space); rise, the walk's bob and the sit in model units
     const wb = dir.walk != null ? -0.02 * Math.abs(Math.cos(dir.walk * M.TAU)) : 0;
-    const sitDrop = ((w.sit || 0) / wsum) * 0.42 * K;
-    nodes.hips.position.set(hipsRest.x + FX * 0.012 * g * sway, hipsRest.y - 0.012 * g * bounce + (dir.rise || 0) + wb - sitDrop, hipsRest.z);
-    // 2. arms: per pose FK or IK, blended as quaternions (sign-aligned nlerp). IK targets are character space
-    // (root: feet at the origin, +Z forward), scaled from the pose authoring model by K
+    nodes.hips.position.copy(hipsRest).add(c2mP(_v1.set(0.036 * s, -(0.002 + 0.006 * dip) * ws, 0)));
+    nodes.hips.position.y += (dir.rise || 0) + wb - (wn.sit || 0) * 0.42 * K;
+    if (ws > 0) plantLegs(s, ws, dir);
+    // 2. arms. Each pose's arm becomes a wrist target and an elbow direction in root space (FK poses by forward
+    // kinematics, IK targets carried by their body frame). They blend as a direction from the shoulder (an arc: no
+    // straight arm mid-move), a reach and an elbow hint, and solve once. Hands blend as root-space orientations, so a
+    // held mic keeps its aim
     root.updateMatrixWorld(true);
-    vrm.scene.updateMatrixWorld(true);
+    for (const [f, n] of Object.entries(FRAMES)) { const F = frame[f]; rootRel(n, F.p, F.d); F.d.multiply(F.q0i); }
+    frame.head.d.slerp(QI, 0.15);   // a held mic follows 85% of her head's turn
+    let lag = null;
     for (const side of ['left', 'right']) {
-      const s = side[0], kU = side + 'UpperArm', kL = side + 'LowerArm';
-      const aU = qBlend[kU] || (qBlend[kU] = new THREE.Quaternion()), aL = qBlend[kL] || (qBlend[kL] = new THREE.Quaternion());
-      aU.set(0, 0, 0, 0); aL.set(0, 0, 0, 0);
-      for (const [name, k] of entries) {
-        const p = POSES[name] || {};
-        const ik = p.ik?.[s] || (dir.ik?.[s] && name === entries[0][0] ? dir.ik[s] : null);
+      const lr = side[0], sg = lr === 'l' ? 1 : -1, kU = side + 'UpperArm', kL = side + 'LowerArm', kH = side + 'Hand';
+      const S = rootRel(nodes[kU], _S);
+      let wAcc = 0, kSum = 0, kPos = 0, lSum = 0, lMin = 9, lMax = 0, hang = 0;
+      _eS.set(0, 0, 0);
+      for (const [name, k] of signed) {
+        const p = POSES[name] || {}, ik = p.ik?.[lr] || (dir.ik?.[lr] && name === signed[0][0] ? dir.ik[lr] : null);
         if (ik) {
-          root.localToWorld(_T.set(ik[0] * K, ik[1] * K, ik[2] * K));
-          const pl = p.ik?.pole || [side === 'left' ? 0.5 : -0.5, -1, -0.45];
-          _Pole.set(pl[0] * (side === 'left' && p.ik?.pole ? -1 : 1), pl[1], pl[2]).transformDirection(root.matrixWorld);
-          solveArm(side, _T, _Pole, qTmpU, qTmpL);
+          const fr = frameOf(p, lr), F = frame[fr];
+          _W.set(ik[0] * K, ik[1] * K, ik[2] * K).sub(F.p0).applyQuaternion(F.d).add(F.p);
+          poleOf(p, lr, _Eb).applyQuaternion(frame[fr === 'hips' ? 'hips' : 'chest'].d);
         } else {
-          const vu = p[kU] || POSES.rest[kU], vl = p[kL] || POSES.rest[kL];
-          qTmpU.setFromEuler(eul(vu[0], vu[1], vu[2])); qTmpL.setFromEuler(eul(vl[0], vl[1], vl[2]));
+          fkArm(side, p); rootRel(nodes[kH], _W); rootRel(nodes[kL], _Eb).sub(S);
+          hang += k * (p.still ? 0 : P.smoothstep(0.2, 0.3, S.y - _W.y));   // hanging below the shoulder
         }
-        const sU = aU.x * qTmpU.x + aU.y * qTmpU.y + aU.z * qTmpU.z + aU.w * qTmpU.w < 0 ? -k : k;
-        const sL = aL.x * qTmpL.x + aL.y * qTmpL.y + aL.z * qTmpL.z + aL.w * qTmpL.w < 0 ? -k : k;
-        aU.x += qTmpU.x * sU; aU.y += qTmpU.y * sU; aU.z += qTmpU.z * sU; aU.w += qTmpU.w * sU;
-        aL.x += qTmpL.x * sL; aL.y += qTmpL.y * sL; aL.z += qTmpL.z * sL; aL.w += qTmpL.w * sL;
+        const len = _a.copy(_W).sub(S).length(); _a.divideScalar(len);
+        _e2.copy(_Eb).addScaledVector(_a, -_Eb.dot(_a));
+        if (_e2.lengthSq() < 1e-8) poleOf({}, lr, _e2).addScaledVector(_a, -_e2.dot(_a));
+        if (wAcc <= 0) { _dS.copy(_a); wAcc = k; } else slerpV(_dS, _a, k / (wAcc += k));
+        kSum += k; kPos += Math.max(0, k); lSum += Math.max(0, k) * len ** -4; lMin = Math.min(lMin, len); lMax = Math.max(lMax, len); _eS.addScaledVector(_e2.normalize(), k);
       }
-      aU.normalize(); aL.normalize();
-      // a small swing on the beat so held arms still breathe
-      const sw = 0.04 * g * Math.sin(Math.PI * u + (side === 'left' ? 0 : 1.3));
-      nodes[kU].quaternion.copy(aU).multiply(_q3.setFromEuler(eul(0, sw * 0.5, sw)));
-      nodes[kL].quaternion.copy(aL);
-      const ov = dir.bones?.[kU]; if (ov) nodes[kU].quaternion.multiply(_q3.setFromEuler(eul(ov[0], ov[1], ov[2])));
+      kSum = kSum || 1;
+      // hands (and fingers, above) on the weights 0.07 s ago: each pose's hand in root space, from its own forearm
+      // turned with its body frame; blended, then put under the final forearm
+      _hq.set(0, 0, 0, 0);
+      for (const [name, k] of entH) {
+        const p = POSES[name] || {}, ik = p.ik?.[lr];
+        if (ik) {
+          solveArm(side, _W.set(ik[0] * K, ik[1] * K, ik[2] * K), poleOf(p, lr, _Eb), qHU, qHL);
+          rootRel(nodes[kU].parent, _v1, _q2);
+          _q.copy(frame[frameOf(p, lr)].d).multiply(_q2).multiply(qHU).multiply(qHL);
+        } else { fkArm(side, p); rootRel(nodes[kL], _v1, _q); }
+        const vh = p[kH] || POSES.rest[kH];
+        _q.multiply(_q2.setFromEuler(eul(vh[0], vh[1], vh[2])));
+        const kk = _hq.dot(_q) < 0 ? -k : k;
+        _hq.set(_hq.x + _q.x * kk, _hq.y + _q.y * kk, _hq.z + _q.z * kk, _hq.w + _q.w * kk);
+      }
+      _hq.normalize();
+      // the reach blends as a soft minimum of the unsigned weights, so a moving arm stays bent until it arrives (and
+      // bends first on the way back); the direction may overshoot, the reach never
+      const T = _T.copy(S).addScaledVector(_dS, M.clamp((lSum / kPos) ** -0.25, lMin, lMax));
+      if (_eS.lengthSq() < 1e-6) poleOf({}, lr, _eS);
+      // shoulder rhythm: the clavicle lifts once the arm rises past ~70 deg and rolls forward on a forward reach
+      const dc = _a.copy(T).sub(S).normalize().applyQuaternion(_q.copy(frame.chest.d).invert());
+      const raise = M.clamp(0.32 * (Math.acos(M.clamp(-dc.y, -1, 1)) - 1.2), 0, 0.28), fwd = M.clamp(0.18 * dc.z, 0, 0.1);
+      if (raise > 0 || fwd > 0) nodes[side + 'Shoulder']?.quaternion.multiply(_q.setFromEuler(eul(0, -sg * fwd, sg * raise)));
+      solveArm(side, T, _eS, nodes[kU].quaternion, nodes[kL].quaternion);
+      nodes[kU].updateWorldMatrix(false, false); nodes[kL].updateWorldMatrix(false, false);
+      rootRel(nodes[kL], _v1, _q); nodes[kH].quaternion.copy(_q.invert().multiply(_hq));
+      // forearm roll: the forearm takes half the hand's twist about the arm, so the wrist never candy-wraps
+      const hq = nodes[kH].quaternion, tw = Math.atan2(hq.w < 0 ? -hq.x : hq.x, Math.abs(hq.w));
+      nodes[kL].quaternion.multiply(_q.setFromAxisAngle(_X, tw)); hq.premultiply(_q.invert());
+      // hanging arms: they keep part of where the torso was 0.2 s ago (its tilt, and where it carried the shoulder),
+      // hang plumb against the rest of the tilt, swing against the hips, open out over the standing hip (the skirt),
+      // give at the elbow just after the dip and live a little (seeded noise)
+      const hk = hang / kSum;
+      if (hk > 0.001) {
+        if (!lag) { const tl = t - 0.2; lag = [torsoAt(t, u, dir), torsoAt(tl, M.U(tl), at(tl))]; }
+        const [now, was] = lag, n = lr === 'l' ? 0 : 1, sl = 0.35 * now.s + 0.65 * was.s;   // the weight ~0.13 s ago, for the swing
+        const dz = 0.6 * was.z - now.z - (now.px - was.px) / 0.55 + 0.065 * sg * Math.max(0, sg * was.s) + 0.022 * M.noise1(t * 0.31, 40 + n);
+        const dx = 0.6 * was.x - now.x + (now.pz - was.pz) / 0.55 - 0.04 * sg * sl + 0.035 * M.noise1(t * 0.23, 42 + n);
+        const pump = 0.08 * dipAt(u - 0.2, dir) + 0.04 * M.noise1(t * 0.37, 44 + n);
+        nodes[kU].quaternion.premultiply(_q.setFromEuler(eul(dx * hk, 0, dz * hk)));
+        nodes[kL].quaternion.premultiply(_q.setFromAxisAngle(_v1.set(0, -sg, 0), pump * hk));
+      }
+      const ov = dir.bones?.[kU]; if (ov) nodes[kU].quaternion.multiply(_q.setFromEuler(eul(ov[0], ov[1], ov[2])));
     }
-    let micW = 0; for (const [name, k] of entries) micW += ((POSES[name] || {}).mic || 0) * k;
-    mic.visible = (dir.mic ?? micW / wsum) > 0.5;
+    let micW = 0; for (const [name, k] of ent) micW += (POSES[name]?.mic || 0) * k;
+    mic.visible = (dir.mic ?? micW) > 0.5;
   }
   function settleWorld() {
     vrm.humanoid.update();
     vrm.scene.updateMatrixWorld(true);
     cons?.update();
   }
-  // face at time t
-  function applyFace(t, u, dir) {
-    for (const n of Object.keys(EXPR)) setX(n, 0);
-    const mood = dir.mood || {};
-    const sing = dir.sing ?? 1;
-    const mo = dir.mouth ? { open: dir.mouth[0], wide: dir.mouth[1] ?? 0.2, round: dir.mouth[2] ?? 0 } : P.mouthAt(t, sing);
-    const open = M.clamp(mo.open * (dir.mouthGain ?? 1.15));
-    // visemes: openness from the vocal envelope, shape from the vowel being sung
-    const round = M.clamp(mo.round), wide = M.clamp(mo.wide);
-    setX('aa', open * M.clamp(1 - round - 0.6 * wide) * 1.0);
-    setX('oh', open * round * 0.7);
-    setX('ou', open * round * 0.45);
-    setX('ee', open * wide * 0.6);
-    setX('ih', open * wide * 0.45);
-    const blink = Math.max(dir.blink ?? P.blinkAt(t), 0);
-    const happy = mood.happy || 0;
-    setX('blink', M.clamp(blink * (1 - happy)));
-    if (dir.wink) setX('blinkLeft', M.clamp(dir.wink));
-    for (const k of ['happy', 'angry', 'sad', 'relaxed', 'surprised', 'extra']) if (mood[k]) setX(k, M.clamp(mood[k]));
+  // small in frame, the mouth opens a little more so she still reads as singing: as her head (from the head bone's
+  // depth and the camera's fov) shrinks from 15% to 6% of the frame height, the mouth gain ramps from 1 to 1.25
+  const _hw = new THREE.Vector3(), _cw = new THREE.Vector3();
+  function framingGain(cam) {
+    if (!cam?.isPerspectiveCamera) return 1;
+    nodes.head.getWorldPosition(_hw).sub(_cw.setFromMatrixPosition(cam.matrixWorld));
+    const depth = Math.max(0.05, _hw.dot(cam.getWorldDirection(_cw)));
+    return M.lerp(1, 1.25, P.smoothstep(0.15, 0.06, (HEAD_H * cam.zoom) / (2 * depth * Math.tan((cam.fov * Math.PI) / 360))));
+  }
+  // face at time t: visemes from performance.js, seeded blinks, moods as eye and mouth halves. Singing ("act") the eyes
+  // smile softly and the mouth is left to the visemes; between lines the smile and the ^^ eyes come through
+  function applyFace(t, d, at, cam) {
+    // sing and moods step inside shots: averaged over the last 0.15 s, a step eases instead of popping the face
+    let sing = 0; const mood = {};
+    for (let k = 0; k < 8; k++) {
+      const dk = k ? at(t - (k * 0.15) / 7) : d;
+      sing += M.clamp(dk.sing ?? 1) / 8;
+      for (const [m, v] of Object.entries(dk.mood || {})) mood[m] = (mood[m] || 0) + M.clamp(v) / 8;
+    }
+    for (const e of em.expressions) e.weight = 0;
+    const vis = d.mouth ? legacyMouth(d.mouth) : P.visemesAt(t, sing * framingGain(cam) * (d.mouthGain ?? 1));
+    for (const k in vis) setX(k, vis[k]);
+    const act = sing * P.activityAt(t), idle = 1 - act;
+    const h = mood.happy || 0, r = mood.relaxed || 0, s = mood.sad || 0, su = mood.surprised || 0;
+    const eyeJoy = h * (0.45 * act + 0.75 * idle);
+    setX('eyeJoy', eyeJoy);
+    setX('mthFun', Math.min(1 - Math.min(0.8, r), 0.6 * h + 0.12 * idle * (1 - h) * (1 - s)));   // smile corners + a soft resting smile
+    setX('mthJoy', 0.15 * P.smoothstep(0.5, 1, h) * idle);   // a parted happy mouth only between lines, only for big joy
+    setX('relaxed', Math.min(0.8, r));                       // VRoid "Fun": a closed smile, soft lids
+    setX('angry', mood.angry || 0);                          // closed, corners down (the twin's sneer)
+    setX('extra', mood.extra || 0);
+    setX('eyeSorrow', s); setX('mthSorrow', 0.4 * s * idle);
+    setX('eyeSurprised', su); setX('mthSurprised', 0.3 * su * idle);
+    setX('blink', M.clamp(d.blink ?? P.blinkAt(t)) * (1 - Math.min(1, eyeJoy + 0.5 * su)));
+    if (d.wink) setX('blinkLeft', M.clamp(d.wink) * (1 - eyeJoy));
     em.update();
   }
   const camWorld = new THREE.Vector3();
@@ -650,17 +898,17 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
     root.updateMatrixWorld(true);
     if (springs && d.springs !== false) {
       const t0 = t - WARM * DT;
-      applyPose(t0, M.U(t0), at(t0)); settleWorld();
+      applyPose(t0, M.U(t0), at(t0), at); settleWorld();
       springs.reset();
       for (let k = WARM - 1; k >= 0; k--) {
         const tk = t - k * DT;
-        applyPose(tk, M.U(tk), k ? at(tk) : d); settleWorld();
+        applyPose(tk, M.U(tk), k ? at(tk) : d, at); settleWorld();
         springs.update(DT);
       }
     } else {
-      applyPose(t, u, d); settleWorld();
+      applyPose(t, u, d, at); settleWorld();
     }
-    applyFace(t, u, d);
+    applyFace(t, d, at, cam);
     applyLook(d, cam);
     vrm.scene.updateMatrixWorld(true);
     return d;
