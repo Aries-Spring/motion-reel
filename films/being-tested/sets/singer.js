@@ -418,6 +418,9 @@ const restR = { rightUpperArm: [-0.08, 0.18, 1.37], rightLowerArm: [0, 0.3, 0], 
 // the right fist holds the mic 5 cm under her lips and a little in front, aimed at them; it rides with her head
 const micR = { ik: { r: [-0.063, 1.284, 0.163], pole: [-0.6, -1, -0.737], frame: { r: 'head' } }, rightHand: [-0.263, -0.513, 0.425], ...fist('r'), mic: 1 };
 const hipL = { l: [0.151, 1.012, -0.015], poleL: [0.7, 0.1, -0.6] }, hipHandL = [-0.484, -0.125, 0.525];   // left palm on the waist
+// adrift (the fall, the dream): arms afloat, elbows and knees loose
+const afloat = { spine: [-0.06, 0, 0], leftUpperArm: [0.15, -0.2, -0.75], rightUpperArm: [0.15, 0.2, 0.75], leftLowerArm: [0, -0.6, 0], rightLowerArm: [0, 0.6, 0], leftHand: [-0.2, 0, -0.2], rightHand: [-0.2, 0, 0.2],
+  ...relax('l', 0.8), ...relax('r', 0.8), leftUpperLeg: [-0.15, 0, 0.04], rightUpperLeg: [0.25, 0, -0.04], leftLowerLeg: [0.55, 0, 0], rightLowerLeg: [0.3, 0, 0] };
 export const POSES = {
   rest: { ...restL, ...restR },
   mic: { ...restL, ...micR },
@@ -446,8 +449,10 @@ export const POSES = {
     ...fingers('l', { Index: 0.6, Middle: 0.5, Ring: 0.4, Little: 0.3, Thumb: 0.5 }), ...fingers('r', { Index: 0.6, Middle: 0.5, Ring: 0.4, Little: 0.3, Thumb: 0.5 }) },
   reach: { spine: [-0.04, 0, 0], ...restL, ik: { r: [-0.261, 1.407, 0.444], pole: [-1.3, -1, 0.15], frame: 'chest' }, rightHand: [0, -0.125, -0.281], rightShoulder: [0, 0.1, -0.03],
     ...fingers('r', { Index: 0.92, Middle: 0.85, Ring: 0.75, Little: 0.65, Thumb: 0.7, spread: true }) },
-  float: { spine: [-0.06, 0, 0], leftUpperArm: [0.15, -0.2, -0.75], rightUpperArm: [0.15, 0.2, 0.75], leftLowerArm: [0, -0.6, 0], rightLowerArm: [0, 0.6, 0], leftHand: [-0.2, 0, -0.2], rightHand: [-0.2, 0, 0.2],
-    ...relax('l', 0.8), ...relax('r', 0.8), leftUpperLeg: [-0.15, 0, 0.04], rightUpperLeg: [0.25, 0, -0.04], leftLowerLeg: [0.55, 0, 0], rightLowerLeg: [0.3, 0, 0] },
+  float: afloat,
+  // still adrift, her left hand reaching out to the hand of words (legs: false keeps the floating legs)
+  floatReach: { ...afloat, ik: { l: [0.42, 1.4, 0.3], poleL: [1.3, -1, 0.15], frame: 'chest' }, leftHand: [0, 0.125, 0.281], leftShoulder: [0, -0.1, 0.03],
+    ...fingers('l', { Index: 0.92, Middle: 0.85, Ring: 0.75, Little: 0.65, Thumb: 0.7, spread: true }) },
   sit: { spine: [0.1, 0, 0], leftUpperLeg: [-1.45, 0, 0.06], rightUpperLeg: [-1.4, 0, -0.06], leftLowerLeg: [1.35, 0, 0], rightLowerLeg: [1.5, 0, 0], leftFoot: [0.1, 0, 0], rightFoot: [0.1, 0, 0],
     leftUpperArm: [0.3, -0.3, -1.25], rightUpperArm: [0.3, 0.3, 1.25], leftLowerArm: [0, -0.5, 0], rightLowerArm: [0, 0.5, 0], ...relax('l'), ...relax('r'), still: 1 },
   hush: { ...restL, ik: { r: [-0.01, 1.32, 0.15] }, rightHand: [0, -0.4, 1.4], ...fingers('r', { Index: 1 }) },
@@ -479,32 +484,43 @@ function weightAt(t, u, dir) {
 }
 // the knees give on the beat: 0..1 times the groove
 const dipAt = (u, dir) => (dir.groove ?? 1) * (0.5 + 0.5 * Math.cos(M.TAU * u)) ** 1.5;
+// the walk. dir.walk: the phase in cycles (her left heel strikes on whole cycles, her right on halves); dir.stride: how
+// far she travels per cycle (m), so a foot that is down stays put on the floor as she moves on
+const DUTY = 0.62;   // a foot is down 62% of the cycle: both are down for the 12% after each heel strike
+const minJerk = (x) => x * x * x * (10 + x * (6 * x - 15));
+// one foot, p cycles after its heel strike: where it is (z from the strike: moving back while it is down, then
+// swinging through), lift, pitch (- toes up, rolling on the heel; + heel up, rolling on the ball), toes bent at the ball
+function stepAt(p, L) {
+  if (p < DUTY) { const pitch = -0.25 * (1 - P.smoothstep(0, 0.1, p)) + 1.0 * P.smoothstep(0.3, DUTY, p) ** 1.5; return { z: -L * p, lift: 0, pitch, toe: Math.min(0.6, Math.max(0, pitch)) }; }
+  const s = (p - DUTY) / (1 - DUTY), a = s ** 0.8;
+  return { z: L * (minJerk(s) - p), lift: 0.8 * a * a * (1 - a) * (1 - a), pitch: M.lerp(1.0, -0.25, P.smoothstep(0, 0.9, s)), toe: 0.6 * (1 - P.smoothstep(0, 0.3, s)) };
+}
+// the torso on the walk: weight over the foot that is down (+ left), the pelvis turning with the leading leg, the bob
+// (lowest just after each heel strike)
+const walkAt = (ph) => ({ s: 0.7 * Math.cos(M.TAU * (ph - 0.3)), turn: -0.07 * Math.cos(M.TAU * ph), bob: -0.01 * (1 + Math.cos(2 * M.TAU * (ph - 0.06))) });
 // the torso's groove at (t, u), the one source for the pose and the arms' lag: the hips over the standing leg (the
-// free hip forward), the chest rolling back so the shoulders stay level and the head upright, the dip on the beat,
-// breath, the head's idle. s: the weight, gated to standing poses by ws (sit, float, walk and legs: false keep their own)
+// free hip forward), the chest rolling back so the shoulders stay level and the head upright, the dip on the beat, the
+// head's idle; the phrasing (performance.js): chest and shoulders rising with the breath before a line, a lean in and
+// the chin up on a held note, a small nod on a stressed vowel, a settle after the line; on the walk, the pelvis and
+// shoulders turning against each other. s: the weight, gated to standing poses by ws (sit, float and legs: false keep
+// their own legs)
 function addsAt(t, u, dir) {
-  const { wn } = weightsOf(dir.poses);
-  const ws = dir.walk != null || dir.legs === false ? 0 : M.clamp(1 - (wn.sit || 0) - (wn.float || 0));
-  const s = weightAt(t, u, dir) * ws, s1 = weightAt(t, u - 0.12, dir) * ws, s2 = weightAt(t, u - 0.25, dir) * ws;
-  const dip = dipAt(u, dir), breath = 0.012 * Math.sin((M.TAU * t) / 3.6);
-  const h = P.headAt(t, u), hb = dir.head || [0, 0, 0];
+  const { wn } = weightsOf(dir.poses), wk = dir.walk != null;
+  const ws = dir.legs === false ? 0 : M.clamp(1 - (wn.sit || 0) - (wn.float || 0));
+  const sAt = (lu, lw) => ws * (wk ? walkAt(dir.walk - lw).s : weightAt(t, u - lu, dir));   // lagged lu beats (lw cycles on the walk)
+  const s = sAt(0, 0), s1 = sAt(0.12, 0.05), s2 = sAt(0.25, 0.1), wa = wk ? walkAt(dir.walk) : { turn: 0, bob: 0 }, tn = wa.turn * ws;
+  const dip = dipAt(u, dir), { breath: br, belt: bt, accent: ac, settle: se } = P.phraseAt(t);
+  const h = P.headAt(t, u), hb = dir.head || [0, 0, 0], sh = 0.025 * dip - 0.03 * br + 0.02 * se;   // shoulders down
   const add = {
-    hips: [0.015 * dip * ws, 0.05 * s + (dir.hipsYaw || 0), 0.065 * s],
-    spine: [0.02 * dip + (dir.lean || 0), -0.025 * s1, -0.015 * s1],
-    chest: [0.01 * dip + breath, -0.02 * s1, -0.03 * s1],
-    upperChest: [0.5 * breath, 0, -0.012 * s1],
-    neck: [h.pitch * 0.5, h.yaw * 0.4, h.roll * 0.4 + 0.015 * s2],
-    head: [h.pitch * 0.8 + hb[0] - 0.015 * dip, h.yaw * 0.8 + hb[1], h.roll * 0.8 + hb[2] + 0.025 * s2],
-    leftShoulder: [0, 0, -0.025 * dip - 0.3 * breath], rightShoulder: [0, 0, 0.025 * dip + 0.3 * breath],
+    hips: [0.015 * dip * ws, (wk ? tn : 0.05 * s) + (dir.hipsYaw || 0), 0.065 * s],
+    spine: [0.02 * dip + (dir.lean || 0) + (wk ? 0.03 : 0) + 0.03 * bt + 0.008 * se, -0.025 * s1 - 0.8 * tn, -0.015 * s1],
+    chest: [0.01 * dip - 0.02 * br + 0.008 * bt + 0.012 * se, -0.02 * s1 - 0.6 * tn, -0.03 * s1],
+    upperChest: [-0.012 * br, 0, -0.012 * s1],
+    neck: [h.pitch * 0.5 - 0.008 * br - 0.015 * bt + 0.008 * ac, h.yaw * 0.4 + 0.2 * tn, h.roll * 0.4 + 0.015 * s2],
+    head: [h.pitch * 0.8 + hb[0] - 0.015 * dip - 0.04 * bt + 0.02 * ac + 0.015 * se, h.yaw * 0.8 + hb[1] + 0.2 * tn, h.roll * 0.8 + hb[2] + 0.025 * s2],
+    leftShoulder: [0, 0, -sh], rightShoulder: [0, 0, sh],
   };
-  if (dir.walk != null) {
-    const ph = dir.walk * M.TAU, sw = 0.42;
-    add.leftUpperLeg = [-sw * Math.sin(ph), 0, 0.02]; add.rightUpperLeg = [sw * Math.sin(ph), 0, -0.02];
-    add.leftLowerLeg = [0.5 * Math.max(0, Math.sin(ph + 1.6)) + 0.08, 0, 0]; add.rightLowerLeg = [0.5 * Math.max(0, Math.sin(ph + 1.6 + Math.PI)) + 0.08, 0, 0];
-    add.leftFoot = [0.15 * Math.sin(ph), 0, 0]; add.rightFoot = [-0.15 * Math.sin(ph), 0, 0];
-    add.hips = [0, 0.08 * Math.sin(ph), 0]; add.spine = [0.04, -0.06 * Math.sin(ph), 0];
-  }
-  return { add, s, dip, ws };
+  return { add, s, dip, ws, bob: wa.bob * ws };
 }
 
 // the mic: ivory body, clay band, slate grille (held in the right fist; normalized hand frame)
@@ -575,7 +591,6 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
   for (const b of BONES) { const n = vrm.humanoid.getNormalizedBoneNode(b); if (n) nodes[b] = n; }
   const hipsRest = nodes.hips.position.clone();
   vrm.lookAt.autoUpdate = false;
-  const lookTarget = new THREE.Object3D(); root.add(lookTarget);
   vrm.humanoid.update(); vrm.scene.updateMatrixWorld(true);
   const wpos = (n) => new THREE.Vector3().setFromMatrixPosition(n.matrixWorld);
   const headY = wpos(vrm.humanoid.getRawBoneNode('head')).y;
@@ -615,9 +630,10 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
     const dL = oL.clone().normalize(), f0 = fwdM.clone().addScaledVector(dL, -fwdM.dot(dL)).normalize();
     const ankle = rootRel(nodes[side + 'Foot']).clone();
     const ball = nodes[side + 'Toes'] ? rootRel(nodes[side + 'Toes']).clone().sub(ankle) : new THREE.Vector3(0, -0.063, 0.108);
-    legRest[side] = { oU: nodes[side + 'UpperLeg'].position.clone(), la: oL.length(), lb: oF.length(), dF: oF.normalize(), ankle, ball,
+    const heel = new THREE.Vector3(0, 0.01 - ankle.y, -0.04);   // the back of the sole, from the ankle
+    legRest[side] = { oU: nodes[side + 'UpperLeg'].position.clone(), la: oL.length(), lb: oF.length(), dF: oF.normalize(), ankle, ball, heel,
       B0inv: new THREE.Matrix4().makeBasis(dL, f0, dL.clone().cross(f0)).invert() };
-    leg[side] = { A: new THREE.Vector3(), pole: new THREE.Vector3(), qF: new THREE.Quaternion(), qY: new THREE.Quaternion() };
+    leg[side] = { A: new THREE.Vector3(), pole: new THREE.Vector3(), qF: new THREE.Quaternion(), qY: new THREE.Quaternion(), toe: 0 };
   }
   // the stance (character space): ankle x, ankle z from rest, toe-out; feet 12 cm apart, her left a touch forward
   const STANCE = { left: { x: 0.064, z: 0.025, yaw: 0.2 }, right: { x: -0.06, z: -0.012, yaw: -0.1 } };
@@ -687,28 +703,38 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
   const qLU = new THREE.Quaternion(), qLL = new THREE.Quaternion(), qLF = new THREE.Quaternion(), qHU = new THREE.Quaternion(), qHL = new THREE.Quaternion(), _hq = new THREE.Quaternion();
   const _S = new THREE.Vector3(), _T = new THREE.Vector3(), _W = new THREE.Vector3(), _Eb = new THREE.Vector3(), _a = new THREE.Vector3(), _e2 = new THREE.Vector3(), _dS = new THREE.Vector3(), _eS = new THREE.Vector3();
   // planted feet: two-bone IK onto the stance, the free heel peeling up about the ball of the foot, knees over the
-  // toes (a touch inward); blended in by ws so a crossfade to a pose with its own legs (sit, float) stays continuous
+  // toes (a touch inward); on the walk each foot rolls heel to toe where it is down and swings through on an arc.
+  // Blended in by ws so a crossfade to a pose with its own legs (sit, float) stays continuous
   function plantLegs(s, ws, dir) {
     for (const side of ['left', 'right']) {
-      const st = { ...STANCE[side], ...dir.stance?.[side] }, R = legRest[side], L = leg[side], sg = side === 'left' ? 1 : -1;
-      const fr = M.clamp((M.clamp(-sg * s) - 0.25) / 0.75), th = (dir.heel ?? 0.085) * fr * fr * (3 - 2 * fr);
+      const R = legRest[side], L = leg[side], sg = side === 'left' ? 1 : -1;
+      let st, th, lift = 0;
+      if (dir.walk != null) {
+        const p = dir.walk - (sg > 0 ? 0 : 0.5), sd = dir.stride ?? 1.2, f = stepAt(p - Math.floor(p), sd);
+        st = { x: 0.045 * sg, z: 0.25 * sd + f.z, yaw: 0.08 * sg }; th = f.pitch; lift = f.lift; L.toe = f.toe;
+      } else {
+        const fr = M.clamp((M.clamp(-sg * s) - 0.25) / 0.75);
+        st = { ...STANCE[side], ...dir.stance?.[side] }; th = L.toe = (dir.heel ?? 0.085) * fr * fr * (3 - 2 * fr);
+      }
+      const pv = th < 0 ? R.heel : R.ball;   // the foot rolls on its heel or on its ball, which stays put
       L.qY.setFromAxisAngle(_Y, st.yaw); L.qF.setFromAxisAngle(_X, th).premultiply(L.qY);
-      c2mP(L.A.set(st.x, R.ankle.y, R.ankle.z + st.z).add(_v1.copy(R.ball).applyQuaternion(L.qY)).sub(_v1.copy(R.ball).applyQuaternion(L.qF)));
+      c2mP(L.A.set(st.x, R.ankle.y + lift, R.ankle.z + st.z).add(_v1.copy(pv).applyQuaternion(L.qY)).sub(_v1.copy(pv).applyQuaternion(L.qF)));
       c2mV(L.pole.set(Math.sin(st.yaw * 0.5 - sg * 0.12), -0.05, Math.cos(st.yaw * 0.5 - sg * 0.12)));
-      cq2m(L.qF); cq2m(L.qY);
+      cq2m(L.qF);
     }
-    // the knees never lock: a leg asked for more than 0.998 of its reach brings the hips down (a soft max)
+    // the knees never lock: a leg asked for more than 0.998 of its reach brings the hips down (a soft max) as far as it
+    // must to reach (straight down: on the walk the feet are well ahead of and behind the hips)
     let ex = -1;
     for (const side of ['left', 'right']) {
-      const R = legRest[side];
-      ex = Math.max(ex, _v1.copy(R.oU).applyQuaternion(nodes.hips.quaternion).add(nodes.hips.position).distanceTo(leg[side].A) - 0.998 * (R.la + R.lb));
+      const R = legRest[side], H = _v1.copy(R.oU).applyQuaternion(nodes.hips.quaternion).add(nodes.hips.position).sub(leg[side].A);
+      ex = Math.max(ex, H.y - Math.sqrt(Math.max(0, (0.998 * (R.la + R.lb)) ** 2 - H.x * H.x - H.z * H.z)));
     }
     nodes.hips.position.y -= 0.002 * Math.log1p(Math.exp(ex / 0.002)) * ws;
     for (const side of ['left', 'right']) {
       const L = leg[side];
       solveLeg(side, L.A, L.pole, L.qF, qLU, qLL, qLF);
       nodes[side + 'UpperLeg'].quaternion.slerp(qLU, ws); nodes[side + 'LowerLeg'].quaternion.slerp(qLL, ws); nodes[side + 'Foot'].quaternion.slerp(qLF, ws);
-      nodes[side + 'Toes']?.quaternion.slerp(L.qF.invert().multiply(L.qY), ws);   // toes flat on the floor
+      nodes[side + 'Toes']?.quaternion.slerp(cq2m(_lq.setFromAxisAngle(_X, -L.toe)), ws);   // toes flat on the floor
     }
   }
   // the torso at (t, u, dir): summed pitch / roll of hips..upperChest (VRM1 frame), how far they and the hips' shift
@@ -742,8 +768,7 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
   // at another time: the hands follow the arms late and hanging arms lag the torso
   function applyPose(t, u, dir, at) {
     const { wn, ent, signed } = weightsOf(dir.poses), entH = weightsOf(at(t - 0.07).poses).ent;
-    const { add, s, dip, ws } = addsAt(t, u, dir);
-    if (dir.walk != null) { const sw = 0.35 * Math.sin(dir.walk * M.TAU); dir = { ...dir, bones: { ...(dir.bones || {}), leftUpperArm: [0, sw, 0], rightUpperArm: [0, sw, 0] } }; }
+    const { add, s, dip, ws, bob } = addsAt(t, u, dir);
     // 1. every bone but the arms: weighted euler blend (small angles) + groove + per-shot offsets; fingers on the
     // hands' late weights
     for (const b of BONES) {
@@ -756,10 +781,9 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
       const d = add[b] || ZERO, o = dir.bones?.[b] || ZERO;
       n.quaternion.setFromEuler(eul(x + d[0] + o[0], y + d[1] + o[1], z + d[2] + o[2]));
     }
-    // the hips over the standing leg and down on the dip (character space); rise, the walk's bob and the sit in model units
-    const wb = dir.walk != null ? -0.02 * Math.abs(Math.cos(dir.walk * M.TAU)) : 0;
-    nodes.hips.position.copy(hipsRest).add(c2mP(_v1.set(0.036 * s, -(0.002 + 0.006 * dip) * ws, 0)));
-    nodes.hips.position.y += (dir.rise || 0) + wb - (wn.sit || 0) * 0.42 * K;
+    // the hips over the standing leg, down on the dip and the walk's bob (character space); rise and the sit in model units
+    nodes.hips.position.copy(hipsRest).add(c2mP(_v1.set(0.036 * s, bob - (0.002 + 0.006 * dip) * ws, 0)));
+    nodes.hips.position.y += (dir.rise || 0) - (wn.sit || 0) * 0.42 * K;
     if (ws > 0) plantLegs(s, ws, dir);
     // 2. arms. Each pose's arm becomes a wrist target and an elbow direction in root space (FK poses by forward
     // kinematics, IK targets carried by their body frame). They blend as a direction from the shoulder (an arc: no
@@ -822,15 +846,17 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
       const hq = nodes[kH].quaternion, tw = Math.atan2(hq.w < 0 ? -hq.x : hq.x, Math.abs(hq.w));
       nodes[kL].quaternion.multiply(_q.setFromAxisAngle(_X, tw)); hq.premultiply(_q.invert());
       // hanging arms: they keep part of where the torso was 0.2 s ago (its tilt, and where it carried the shoulder),
-      // hang plumb against the rest of the tilt, swing against the hips, open out over the standing hip (the skirt),
+      // hang plumb against the rest of the tilt, swing against the hips (on the walk, against the legs: the right arm
+      // forward with the left foot, the elbow bending as it comes forward), open out over the standing hip (the skirt),
       // give at the elbow just after the dip and live a little (seeded noise)
       const hk = hang / kSum;
       if (hk > 0.001) {
         if (!lag) { const tl = t - 0.2; lag = [torsoAt(t, u, dir), torsoAt(tl, M.U(tl), at(tl))]; }
-        const [now, was] = lag, n = lr === 'l' ? 0 : 1, sl = 0.35 * now.s + 0.65 * was.s;   // the weight ~0.13 s ago, for the swing
+        const [now, was] = lag, n = lr === 'l' ? 0 : 1, sl = 0.6 * now.s + 0.4 * was.s;   // the weight ~0.08 s ago: the swing trails the sway ~0.14 s
+        const sw = dir.walk != null ? 0.28 * ws * Math.cos(M.TAU * (dir.walk - 0.04)) : 0;
         const dz = 0.6 * was.z - now.z - (now.px - was.px) / 0.55 + 0.065 * sg * Math.max(0, sg * was.s) + 0.022 * M.noise1(t * 0.31, 40 + n);
-        const dx = 0.6 * was.x - now.x + (now.pz - was.pz) / 0.55 - 0.04 * sg * sl + 0.035 * M.noise1(t * 0.23, 42 + n);
-        const pump = 0.08 * dipAt(u - 0.2, dir) + 0.04 * M.noise1(t * 0.37, 44 + n);
+        const dx = 0.6 * was.x - now.x + (now.pz - was.pz) / 0.55 + sg * (sw - 0.04 * sl) + 0.035 * M.noise1(t * 0.23, 42 + n);
+        const pump = 0.08 * dipAt(u - 0.2, dir) + 0.25 * Math.max(0, -sg * sw) + 0.04 * M.noise1(t * 0.37, 44 + n);
         nodes[kU].quaternion.premultiply(_q.setFromEuler(eul(dx * hk, 0, dz * hk)));
         nodes[kL].quaternion.premultiply(_q.setFromAxisAngle(_v1.set(0, -sg, 0), pump * hk));
       }
@@ -853,6 +879,24 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
     const depth = Math.max(0.05, _hw.dot(cam.getWorldDirection(_cw)));
     return M.lerp(1, 1.25, P.smoothstep(0.15, 0.06, (HEAD_H * cam.zoom) / (2 * depth * Math.tan((cam.fov * Math.PI) / 360))));
   }
+  // a blink rides on a big move: a pose change, a turn of dir.head or a jump of the gaze target (lookAt on / off) starting
+  // in the last 0.25 s. Onsets are found on a fixed 1/30 s grid, so every t sees the same ones
+  const moved = (a, b) => {
+    const wa = weightsOf(a.poses).wn, wb = weightsOf(b.poses).wn, ha = a.head || ZERO, hb = b.head || ZERO;
+    let dw = 0; for (const n of new Set([...Object.keys(wa), ...Object.keys(wb)])) dw += Math.abs((wa[n] || 0) - (wb[n] || 0));
+    return dw > 0.3 || Math.hypot(ha[0] - hb[0], ha[1] - hb[1], ha[2] - hb[2]) > 0.05 || !a.lookAt !== !b.lookAt;
+  };
+  function moveBlink(t, at) {
+    if (at(t) === at(t - 1)) return 0;   // a fixed direction never moves
+    const h = 1 / 30, j1 = Math.floor(t / h);
+    let b = 0, was = null;
+    for (let j = Math.floor((t - 0.25) / h) - 1; j <= j1; j++) {
+      const m = moved(at(j * h), at(j * h - 0.1));
+      if (m && was === false) b = Math.max(b, P.blinkShape(t - j * h));
+      was = m;
+    }
+    return b;
+  }
   // face at time t: visemes from performance.js, seeded blinks, moods as eye and mouth halves. Singing ("act") the eyes
   // smile softly and the mouth is left to the visemes; between lines the smile and the ^^ eyes come through
   function applyFace(t, d, at, cam) {
@@ -865,10 +909,11 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
     }
     for (const e of em.expressions) e.weight = 0;
     const vis = d.mouth ? legacyMouth(d.mouth) : P.visemesAt(t, sing * framingGain(cam) * (d.mouthGain ?? 1));
+    if (!d.mouth) { const pt = sing * P.phraseAt(t).part; vis.aa = Math.max(vis.aa, 0.1 * pt); vis.ih = Math.max(vis.ih, 0.06 * pt); }   // lips part for the breath
     for (const k in vis) setX(k, vis[k]);
     const act = sing * P.activityAt(t), idle = 1 - act;
     const h = mood.happy || 0, r = mood.relaxed || 0, s = mood.sad || 0, su = mood.surprised || 0;
-    const eyeJoy = h * (0.45 * act + 0.75 * idle);
+    const eyeJoy = h * ((0.45 + 0.15 * P.smoothstep(0.6, 0.8, h)) * act + 0.75 * idle);   // a big smile shows in the eyes while singing too
     setX('eyeJoy', eyeJoy);
     setX('mthFun', Math.min(1 - Math.min(0.8, r), 0.6 * h + 0.12 * idle * (1 - h) * (1 - s)));   // smile corners + a soft resting smile
     setX('mthJoy', 0.15 * P.smoothstep(0.5, 1, h) * idle);   // a parted happy mouth only between lines, only for big joy
@@ -877,16 +922,22 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
     setX('extra', mood.extra || 0);
     setX('eyeSorrow', s); setX('mthSorrow', 0.4 * s * idle);
     setX('eyeSurprised', su); setX('mthSurprised', 0.3 * su * idle);
-    setX('blink', M.clamp(d.blink ?? P.blinkAt(t)) * (1 - Math.min(1, eyeJoy + 0.5 * su)));
+    setX('blink', M.clamp(d.blink ?? Math.max(P.blinkAt(t), moveBlink(t, at))) * (1 - Math.min(1, eyeJoy + 0.5 * su)));
     if (d.wink) setX('blinkLeft', M.clamp(d.wink) * (1 - eyeJoy));
     em.update();
   }
-  const camWorld = new THREE.Vector3();
-  function applyLook(dir, cam) {
-    if (dir.lookAt) lookTarget.position.set(...dir.lookAt);
-    else if (cam) { cam.getWorldPosition(camWorld); root.worldToLocal(lookTarget.position.copy(camWorld)); }
-    lookTarget.updateMatrixWorld();
-    vrm.lookAt.lookAt(lookTarget.getWorldPosition(camWorld));
+  // gaze: the camera (or dir.lookAt, root space) as her head sees it, turned into the eye bones' yaw / pitch the way
+  // three-vrm's lookAt measures them, plus the seeded saccades and glances (performance.js; eye-turn degrees, x9 to the
+  // range maps' 90-deg input). Root-relative, so the same mirrored; applied straight to the eyes (nothing else does)
+  const headRaw = vrm.humanoid.getRawBoneNode('head'), lookOff = vrm.lookAt.offsetFromHeadBone.clone();
+  const qHead0 = new THREE.Quaternion(); rootRel(headRaw, _v1, qHead0);
+  const _gt = new THREE.Vector3(), _gq = new THREE.Quaternion();
+  function applyLook(t, dir, cam) {
+    const E = rootRel(headRaw, _v1, _gq).add(_v2.copy(lookOff).multiplyScalar(sc).applyQuaternion(_gq));
+    if (dir.lookAt || cam) (dir.lookAt ? _gt.set(...dir.lookAt) : root.worldToLocal(cam.getWorldPosition(_gt))).sub(E).applyQuaternion(_gq.invert().premultiply(qHead0));
+    else _gt.set(0, 0, 1);
+    const [gx, gy] = P.gazeAt(t), deg = 180 / Math.PI;
+    vrm.lookAt.applier.applyYawPitch(Math.atan2(_gt.x, _gt.z) * deg + 9 * gx, -Math.atan2(_gt.y, Math.hypot(_gt.x, _gt.z)) * deg + 9 * gy);
   }
 
   const DT = 1 / 60, WARM = 18;   // 0.3 s of replay: the damped springs forget their start long before t
@@ -909,7 +960,7 @@ export async function loadSinger(look = 'claude', base = '', file = 'assets/vrm/
       applyPose(t, u, d, at); settleWorld();
     }
     applyFace(t, d, at, cam);
-    applyLook(d, cam);
+    applyLook(t, d, cam);
     vrm.scene.updateMatrixWorld(true);
     return d;
   }

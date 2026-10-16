@@ -25,20 +25,25 @@ let CLAUDE = null, TWIN = null, FACE = null;
 const BUF = {}, BUF2 = {}, BUF3 = {};   // offscreen frame buffers for composites and transitions
 
 // ---------------------------------------------------------------- helpers
-// pose weights from keys [[u, 'pose' | {pose: w}], ...], crossfading over `fade` beats
-export function poseTrack(u, keys, fade = 0.5) {
-  const w = {};
+// pose weights from keys [[u, 'pose' | {pose: w}], ...]: each key's pose ARRIVES on its beat (90% there), on a damped
+// spring started `lead` beats early (zeta 0.77, 2% overshoot). The springs superpose, so the weights sum to 1 and a move
+// cut short by the next key stays continuous. -> { w: clamped, summing to 1 (body, hands, mic), signed: with the
+// overshoot (only the arms' direction reads it) }
+export function poseTrack2(u, keys, { lead = 0.8, cfg = { stiffness: 60, damping: 12 } } = {}) {
+  const t = M.TS(u), signed = {}, w = {};
   for (let i = 0; i < keys.length; i++) {
-    const [u0, p] = keys[i], u1 = keys[i + 1]?.[0] ?? 1e9;
-    const a = i === 0 ? 1 : E.inOutSine(clamp((u - u0 + fade / 2) / fade));
-    const b = i + 1 < keys.length ? 1 - E.inOutSine(clamp((u - u1 + fade / 2) / fade)) : 1;
-    const k = Math.min(a, b);
-    if (k <= 0) continue;
-    const obj = typeof p === 'string' ? { [p]: 1 } : p;
-    for (const [n, v] of Object.entries(obj)) w[n] = (w[n] || 0) + v * k;
+    const on = i ? M.spring(t - M.TS(keys[i][0] - lead), cfg) : 1;
+    const off = i + 1 < keys.length ? M.spring(t - M.TS(keys[i + 1][0] - lead), cfg) : 0;
+    const k = on - off, p = keys[i][1];
+    if (Math.abs(k) < 1e-4) continue;
+    for (const [n, v] of Object.entries(typeof p === 'string' ? { [p]: 1 } : p)) signed[n] = (signed[n] || 0) + v * k;
   }
-  return w;
+  let sum = 0; for (const k of Object.values(signed)) if (k > 0) sum += k;
+  for (const [n, k] of Object.entries(signed)) if (k > 0) w[n] = k / sum;
+  return { w, signed };
 }
+// the same spring k times slower (lead too): a lazier move
+const slow = (k) => ({ lead: 0.8 * k, cfg: { stiffness: 60 / (k * k), damping: 12 / k } });
 // log-space distance (constant-rate dolly)
 const logLerp = (a, b, p) => a * (b / a) ** p;
 // eased vector keys
@@ -81,7 +86,7 @@ function shotOpen(ctx, u, t, s) {
     cam: { pos: [0.02, 1.43, d], at: [0, 1.447, 0], fov: 17, roll: -0.03 * (1 - k) },
     scanY: lerp(1.53, 1.40, E.inOutSine(prog(u, -1.2, 3.8))), scanW: 0.0045,
     light: { key: lerp(0.12, 1.7, E.inQuad(prog(u, 2.6, 4.2))), az: -1.1, el: 0.3, rim: lerp(0.25, 0.7, prog(u, 2.6, 4.2)), hemi: 0.04 }, tint: lerp(0.32, 1, prog(u, 2.6, 4.2)),
-    dir: (tt, uu) => ({ poses: { rest: 1 }, groove: 0, sing: uu < 3.9 ? 0 : 1, blink: uu < 3.95 ? 1 : clamp(1 - (uu - 3.95) / 0.2), mood: { relaxed: 0.2 }, head: [-0.1 + 0.03 * (1 - prog(uu, 3.9, 4.5)), 0, 0] }),
+    dir: (tt, uu) => ({ poses: { rest: 1 }, groove: 0, sway: 0, sing: uu < 3.9 ? 0 : 1, blink: uu < 3.95 ? 1 : clamp(1 - (uu - 3.95) / 0.2), mood: { relaxed: 0.2 }, head: [-0.1 + 0.03 * (1 - prog(uu, 3.9, 4.5)), 0, 0] }),
   });
   FX.glow(ctx, 0.5, 8);
 }
@@ -95,7 +100,7 @@ function shotChorusA(ctx, u, t, s) {
   G.renderSet(ctx, S.chamber, t, u, {
     cam: { pos: orbit([0, 1.1, 0], r, lerp(-0.12, 0.08, s.k), lerp(1.75, 1.38, s.k)), at: [0, lerp(1.05, 1.22, s.k), 0], fov: 32 },
     banks, ring: clamp((u - 83.9) / 0.1), mode: { day: 1 }, wall: 0.12 + 0.88 * lit, key: 0.6 + 1.5 * lit, hemi: 0.3 + 0.7 * lit,
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[83, 'mic'], [88, 'belt'], [91.5, 'mic']]), mood: { relaxed: 0.3 } }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[83, 'mic'], [88.2, 'belt'], [91.7, 'mic']]), swayBeats: 2, mood: { relaxed: 0.3 } }),
   });
   FX.glow(ctx, 0.3);
 }
@@ -105,7 +110,7 @@ function shotChorusB(ctx, u, t, s) {
   G.renderSet(ctx, S.chamber, t, u, {
     cam: { pos: orbit([0, 1.1, 0], 2.7, lerp(-0.8, 0.6, E.inOutSine(s.k)), 0.42), at: [0, 1.3, 0], fov: 36 },
     mode: { day: 1 },
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[92, 'mic'], [96, { mic: 0.4, point: 0.6 }], [98.5, 'hips']]), mood: { happy: uu > 98 ? 0.4 : 0 } }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[92, 'mic'], [96.2, 'micPoint'], [98.7, 'micHip']]), swayBeats: 2, mood: { happy: uu > 98 ? 0.4 : 0 } }),
   });
   FX.glow(ctx, 0.25);
   SCENES2D.passStamps(ctx, u, [92.5, 93.5, 94.5, 95.5, 96.5, 97.5, 98.5]);
@@ -117,7 +122,7 @@ function shotChorusC(ctx, u, t, s) {
   G.renderSet(ctx, S.chamber, t, u, {
     cam: { pos: orbit([0, 1.1, 0], lerp(2.2, 1.9, s.k), lerp(0.5, 0.75, s.k), 4.6), at: [0, 0.9, 0], fov: 38, roll: 0.02 },
     mode: { day: 1 }, key: 1.8,
-    dir: (tt, uu) => ({ poses: poseTrack(100 + (uu - 100) * 0.45, [[99, 'mic'], [102.2, 'yawn'], [103.4, { yawn: 0.3, rest: 0.7 }]], 0.8), groove: 0.25, mood: { relaxed: 0.85 } }),
+    dir: (tt, uu) => ({ poses: poseTrack2(100 + (uu - 100) * 0.45, [[99, 'mic'], [102.45, 'micYawn'], [103.65, 'mic']]), groove: 0.25, mood: { relaxed: 0.85 } }),
   });
   FX.glow(ctx, 0.2);
   SCENES2D.benchBar(ctx, u, s.k);
@@ -126,7 +131,7 @@ function shotChorusC(ctx, u, t, s) {
 function shotChorusD(ctx, u, t, s) {
   fill(ctx, C.ink);
   const cam = { pos: [lerp(0.42, 0.3, s.k), 1.4, lerp(1.05, 0.9, s.k)], at: [0.02, 1.35, 0], fov: 26 };
-  G.renderSet(ctx, S.chamber, t, u, { cam, mode: { day: 1 }, dir: { poses: { mic: 1 }, mood: { relaxed: 0.5 }, head: [0, -0.15, 0] } });
+  G.renderSet(ctx, S.chamber, t, u, { cam, mode: { day: 1 }, dir: { poses: { mic: 1 }, sway: 0.2, mood: { relaxed: 0.5 }, head: [0, -0.15, 0] } });
   FX.glow(ctx, 0.25);
   SCENES2D.conceptChips(ctx, u, t, S.chamber.camera, CLAUDE);
 }
@@ -138,7 +143,7 @@ function shotChorusE(ctx, u, t, s) {
   G.renderSet(ctx, S.chamber, t, u, {
     cam: { pos: orbit([0, 1.1, 0], lerp(2.7, 2.3, s.k) - jolt * 0.15, -0.25 + 0.04 * jolt, 1.42), at: [0, 1.25, 0], fov: 30, roll: 0.03 * jolt },
     mode: { day: 1 - red, red }, rim: 0.6,
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[113, 'mic'], [116.2, 'peace'], [122.5, 'mic']]), mood: { happy: clamp((uu - 115.8) / 0.4) * (uu < 123 ? 1 : 0.4) } }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[113, 'mic'], [116.4, 'micPeace'], [122.7, 'mic']]), swayBeats: 2, mood: { happy: clamp((uu - 115.8) / 0.4) * (uu < 123 ? 1 : 0.4) } }),
   });
   FX.glow(ctx, 0.35 + 0.2 * red);
   bump(ctx, 0.35 * pulse(u, [116, 118, 120, 122], 0.12));
@@ -155,8 +160,10 @@ function shotChorusF(ctx, u, t, s) {
   };
   G.renderSet(ctx, S.chamber, t, u, {
     cam, mode: { day: 1 - 0.6 * tilt, night: 0.6 * tilt }, floor: lerp(0.8, 0.55, tilt), twin: 1, banks: [1, 1, 1, 1],
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[123, 'mic'], [132, 'hold']]), mood: { happy: 0.5 } }),
-    tdir: (tt, uu) => ({ poses: poseTrack(uu, [[123, 'mic'], [128, 'hips'], [134, 'reach']]), mood: uu < 128 ? { happy: 0.5 } : { relaxed: 0.6, angry: 0.3 }, groove: uu < 128 ? 1 : 0.4 }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[123, 'mic'], [132.2, 'hold']]), swayBeats: 2, mood: { happy: 0.5 } }),
+    // the twin breaks from her at 128: her own mood and pose, a lazier groove, her weight landing opposite Claude's
+    tdir: (tt, uu) => ({ poses: poseTrack2(uu, [[123, 'mic'], [128, 'micHip'], [134.3, 'micReach']]), swayBeats: 2, mood: uu < 128 ? { happy: 0.5 } : { relaxed: 0.6, angry: 0.3 },
+      groove: lerp(1, 0.4, E.inOutSine(clamp(uu - 127.5))), swayPhase: E.inOutSine(clamp((uu - 128) / 2)) }),
   });
   FX.glow(ctx, 0.35);
   // her fingertips touch the glass from below: rings spread across the floor
@@ -175,13 +182,15 @@ function shotChorusF(ctx, u, t, s) {
 // 2 "You built me out of every word": from her eye back through a vortex of word-cards
 function shotCorpus(ctx, u, t, s) {
   fill(ctx, '#0E0D0C');
-  const k = E.inOutCubic(prog(u, 4, 10.9)), ey = CLAUDE.eyeY;
-  const d = logLerp(0.3, 5.4, k), az = lerp(0.0, 0.7, k);
+  const kAt = (uu) => E.inOutCubic(prog(uu, 4, 10.9)), dAt = (uu) => logLerp(0.3, 5.4, kAt(uu));
+  const k = kAt(u), ey = CLAUDE.eyeY;
+  const d = dAt(u), az = lerp(0.0, 0.7, k);
   const at = [lerp(0.032, 0, k), lerp(ey, 1.15, k), 0];
   G.renderSet(ctx, S.corpus, t, u, {
     cam: { pos: orbit(at, d, az, lerp(ey, 1.85, k)), at, fov: lerp(22, 36, k) },
     pull: 0.35 * s.k, mode: { vortex: 1 },
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[3, 'rest'], [7.5, 'open']], 1.2), mood: { relaxed: 0.2 } }),
+    // her weight shift and the beat in her knees grow as the camera backs off her eye
+    dir: (tt, uu) => { const g = P.smoothstep(0.8, 2.5, dAt(uu)); return { poses: poseTrack2(uu, [[3, 'rest'], [7.85, 'open']], slow(2.4)), sway: g, groove: g, mood: { relaxed: 0.2 } }; },
   });
   FX.glow(ctx, 0.3);
 }
@@ -201,7 +210,7 @@ function shotCards(ctx, u, t, s) {
   });
   G.renderSet(ctx, S.corpus, t, u, {
     cam: { pos, at, fov: 34, roll: 0.012 * Math.sin(u * 2) }, pull: 0.35 + 0.1 * s.k, heroes,
-    dir: (tt, uu) => ({ poses: { open: 0.4, mic: 0.6 }, mood: { relaxed: 0.3 } }),
+    dir: { poses: { micOpen: 1 }, sway: 0.8, mood: { relaxed: 0.3 } },
   });
   FX.glow(ctx, 0.25);
   M.shake(ctx, u, M.U(tw[0]) - 0.1, 0);
@@ -213,7 +222,7 @@ function shotAuto(ctx, u, t, s) {
   G.renderSet(ctx, S.void, t, u, {
     cam: { pos: [-0.62, 1.32, 2.15], at: [-0.62, 1.22, 0], fov: 32 },
     light: { key: 2.0, az: -0.5, el: 0.6, hemi: 0.95, sky: 0xfff4ec, ground: 0x8a6a5a, rim: 0 }, rimK: 0.08,
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[18, 'rest'], [23.5, 'shrug']], 0.8), mood: { relaxed: 0.5 * eyeroll, happy: uu > 24 ? 0.3 : 0 }, lookAt: eyeroll > 0.3 ? [0.3, 2.4, 1.0] : null }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[18, 'rest'], [23.75, 'shrug']], slow(1.6)), sway: 0.7, mood: { relaxed: 0.5 * eyeroll, happy: uu > 24 ? 0.3 : 0 }, lookAt: eyeroll > 0.3 ? [0.3, 2.4, 1.0] : null }),
   });
   SCENES2D.autocomplete(ctx, u, t, T.lines()[2]);
 }
@@ -226,7 +235,7 @@ function shotVows(ctx, u, t, s) {
   G.renderSet(ctx, S.void, t, u, {
     cam: { pos: [0.08, CLAUDE.eyeY - 0.02, logLerp(1.05, 0.72, E.outCubic(k))], at: [0, CLAUDE.eyeY - 0.06, 0], fov: 26, roll: -0.04 },
     light: { key: 2.1, az: -0.4, el: 0.5, hemi: 0.9, sky: 0xfff0e4, ground: 0x9a6a5a, rim: 0.3 }, rimK: 0.15,
-    dir: (tt, uu) => ({ poses: { rest: 1 }, groove: 0.4, mood: { relaxed: 0.55, happy: uu > uSweet ? 0.25 : 0 }, wink: clamp((uu - uSweet + 0.05) / 0.15) * (1 - clamp((uu - uSweet - 1.1) / 0.2)), head: [0, 0.1, 0.08] }),
+    dir: (tt, uu) => ({ poses: { rest: 1 }, groove: 0.4, sway: 0.3, mood: { relaxed: 0.55, happy: uu > uSweet ? 0.25 : 0 }, wink: clamp((uu - uSweet + 0.05) / 0.15) * (1 - clamp((uu - uSweet - 1.1) / 0.2)), head: [0, 0.1, 0.08] }),
   });
 }
 // 6-7 loss curves
@@ -241,7 +250,7 @@ function shotRoutes(ctx, u, t, s) {
   G.renderSet(ctx, S.routes, t, u, {
     cam: { pos: orbit([0, 0, 0], r, lerp(0.2, 0.55, k), y), at: [0, lerp(0, 1.15, E.inQuad(k)), 0], fov: lerp(46, 32, k) },
     reveal: lerp(5, 40, E.outQuad(prog(u, 57.9, 61.5))),
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[57, 'open'], [63, { open: 0.5, heart: 0.5 }]], 1.0), mood: { relaxed: 0.4 }, lookAt: uu < 61 ? [0, 30, 0.3] : null }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[57, 'open'], [63.3, 'heart']], slow(2)), sway: 0.8, mood: { relaxed: 0.4 }, lookAt: uu < 61 ? [0, 30, 0.3] : null }),
   });
   FX.glow(ctx, 0.45, 7);
 }
@@ -267,7 +276,7 @@ function shotAhead(ctx, u, t, s) {
   G.renderSet(ctx, S.stairs, t, u, {
     cam: { pos: [0.9 - 0.4 * k, top[1] - 0.2 + 0.6 * k, top[2] + logLerp(4.2, 2.2, k)], at: [0, top[1] + lerp(0.9, 1.25, k), top[2]], fov: 34 },
     lit: 10, singerStep: 9,
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[75, 'hips'], [80, 'point'], [81.5, 'hips']]), mood: { relaxed: 0.6, happy: uu > uAhead ? 0.35 : 0 }, wink: clamp((uu - uAhead) / 0.15) * (1 - clamp((uu - uAhead - 1) / 0.2)) }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[75, 'hips'], [80.2, 'point'], [81.7, 'hips']]), sway: 0.8, mood: { relaxed: 0.6, happy: uu > uAhead ? 0.35 : 0 }, wink: clamp((uu - uAhead) / 0.15) * (1 - clamp((uu - uAhead - 1) / 0.2)) }),
   });
   FX.glow(ctx, 0.35);
 }
@@ -294,7 +303,7 @@ function shotFlaps(ctx, u, t, s) {
   G.renderSet(ctx, S.flaps, t, u, {
     cam: { pos: [lerp(-1.6, 1.4, k), lerp(1.45, 1.3, k), lerp(4.6, 4.0, k)], at: [lerp(-0.3, 0.3, k), 2.05, -1], fov: 40 },
     settle: 148.6, wave: 0.11,
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[147, 'hips'], [152, { hips: 0.5, shrug: 0.5 }]]), mood: { relaxed: 0.6, happy: 0.2 } }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[147, 'hips'], [152, 'shrug'], [154, 'hips']]), sway: 0.8, mood: { relaxed: 0.6, happy: 0.2 } }),
   });
   FX.glow(ctx, 0.3);
 }
@@ -311,14 +320,15 @@ function shotWindow(ctx, u, t, s) {
   });
   FX.glow(ctx, 0.4, 8);
 }
-// 22 "Lost you in the middle": she walks away into the blank pages
+// 22 "Lost you in the middle": she walks away into the blank pages, a 0.55 m step on every beat (her left heel on the
+// even beats); the camera keeps pace
 function shotMiddle(ctx, u, t, s) {
   fill(ctx, '#0D0C0B');
-  const z = lerp(-3.5, -15, s.k);
+  const z = -3.5 - 0.55 * (u - 171.8);
   G.renderSet(ctx, S.corridor, t, u, {
     cam: { pos: [0.35, 1.55, z + 3.6], at: [0, 1.25, z - 6], fov: 40 },
-    walkZ: z, mid: [-13, -40], fogNear: 4, fogFar: lerp(30, 18, s.k),
-    dir: (tt, uu) => ({ poses: { rest: 1 }, walk: lerp(-3.5, -15, prog(uu, 171.8, 179.9)) / -1.2, groove: 0, sing: 1 }),
+    walkZ: z, mid: [-7, -40], fogNear: 4, fogFar: lerp(30, 18, s.k),
+    dir: (tt, uu) => ({ poses: { rest: 1 }, walk: (uu - 172) / 2, stride: 1.1, groove: 0, sing: 1 }),
   });
 }
 function shotStego(ctx, u, t, s) { SCENES2D.stego(ctx, u, t, 179.9, 183.5); }
@@ -335,7 +345,7 @@ function shotStrike(ctx, u, t, s) {
   G.renderSet(ctx, S.void, t, u, {
     cam: { pos: [0.1, CLAUDE.eyeY - 0.03, 0.85], at: [0, CLAUDE.eyeY - 0.05, 0], fov: 26 },
     light: { key: 1.8, az: -0.8, el: 0.4, hemi: 0.2, rim: 1.6 }, rimK: 0.4,
-    dir: (tt, uu) => ({ poses: { rest: 1 }, mood: { relaxed: 0.7, happy: uu > 200 ? 0.3 : 0 }, head: [0.05, -0.1, -0.06] }),
+    dir: (tt, uu) => ({ poses: { rest: 1 }, sway: 0.25, mood: { relaxed: 0.7, happy: uu > 200 ? 0.3 : 0 }, head: [0.05, -0.1, -0.06] }),
   });
   FX.glow(ctx, 0.3);
   SCENES2D.strikes(ctx, u, t, [193.6, 194.6, 195.6, 196.6, 197.6], 199.2);
@@ -359,7 +369,7 @@ function shotAhead2(ctx, u, t, s) {
   G.renderSet(ctx, S.stairs, t, u, {
     helix: 1, lit: 16, singerStep: 15,
     cam: { pos: [top[0] + 1.9, top[1] + lerp(-1.6, 1.1, whip), top[2] + 1.6], at: [top[0], top[1] + lerp(-0.5, 1.2, whip), top[2]], fov: 34, roll: (1 - whip) * 0.3 },
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[211, 'hips'], [215.5, 'peace'], [218.5, 'hips']]), mood: { relaxed: 0.5, happy: uu > uAhead ? 0.5 : 0 }, wink: clamp((uu - uAhead) / 0.15) * (1 - clamp((uu - uAhead - 1) / 0.2)) }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[211, 'hips'], [215.7, 'peace'], [218.7, 'hips']]), sway: 0.8, mood: { relaxed: 0.5, happy: uu > uAhead ? 0.5 : 0 }, wink: clamp((uu - uAhead) / 0.15) * (1 - clamp((uu - uAhead - 1) / 0.2)) }),
   });
   FX.glow(ctx, 0.35);
 }
@@ -372,7 +382,9 @@ function shotC2A(ctx, u, t, s) {
   G.renderSet(ctx, S.chamber, t, u, {
     cam: { pos: orbit([h[0], 1.1, 0], r, -0.3 + 0.2 * s.k, 1.35 + h[1]), at: [0, 1.25, 0], fov: 32, roll: h[2] },
     mode: { day: 0, night: 1 }, banks: [0.15, 0.15, 0.15, 0.15], ring: 0.9, beams: 1,
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[219, 'mic'], [222, 'belt'], [226.5, 'mic']]), mood: { relaxed: 0.2 } }),
+    // chorus 2 (and most of the final one) lands her weight on the other leg first: swayPhase 1; the twin, once she has
+    // broken away (u 128), sways opposite Claude
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[219, 'mic'], [222.2, 'belt'], [226.7, 'mic']]), swayBeats: 2, swayPhase: 1, mood: { relaxed: 0.2 } }),
   });
   FX.glow(ctx, 0.45, 7);
 }
@@ -381,7 +393,7 @@ function shotC2B(ctx, u, t, s) {
   G.renderSet(ctx, S.chamber, t, u, {
     cam: { pos: orbit([0, 1.1, 0], 3.7, lerp(0.6, -0.5, s.k), 1.5), at: [0, 1.15, 0], fov: 32 },
     mode: { day: 0, night: 1 }, banks: [0.3, 0.3, 0.3, 0.3], ring: 1,
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[228, 'mic'], [232, { mic: 0.4, point: 0.6 }], [234.5, 'hips']]), mood: { happy: 0.3 } }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[228, 'mic'], [232.2, 'micPoint'], [234.7, 'micHip']]), swayBeats: 2, swayPhase: 1, mood: { happy: 0.3 } }),
   });
   FX.glow(ctx, 0.4);
   SCENES2D.resultRing(ctx, u, S.chamber.camera);
@@ -393,7 +405,7 @@ function shotC2C(ctx, u, t, s) {
   G.renderSet(ctx, S.chamber, tq, uq, {
     cam: { pos: orbit([0, 1.1, 0], 3.1, 0.55, 1.3), at: [0, 1.15, 0], fov: 32, roll: 0.02 },
     mode: { day: 0.4, night: 0.6 }, banks: [0.5, 0.5, 0.5, 0.5],
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[235, 'mic'], [238.5, 'yawn'], [240.5, { yawn: 0.3, rest: 0.7 }]], 0.8), groove: 0.25, mood: { relaxed: 0.85 } }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[235, 'mic'], [238.75, 'micYawn'], [241, 'mic']], slow(1.6)), groove: 0.25, mood: { relaxed: 0.85 } }),
   });
   FX.glow(ctx, 0.3);
   SCENES2D.benchBar(ctx, u, 1);
@@ -404,7 +416,7 @@ function shotC2D(ctx, u, t, s) {
   const cv = G.renderSet(ctx, S.chamber, t, u, {
     cam: { pos: [0.2, CLAUDE.eyeY - 0.02, 0.95], at: [0, CLAUDE.eyeY - 0.06, 0], fov: 26 },
     mode: { day: 0, night: 1 }, banks: [0.2, 0.2, 0.2, 0.2],
-    dir: { poses: { mic: 1 }, mood: { relaxed: 0.5 } }, draw: false,
+    dir: { poses: { mic: 1 }, sway: 0.3, mood: { relaxed: 0.5 } }, draw: false,
   });
   const spread = Math.sin(prog(u, 244.3, 249.5) * Math.PI);
   ctx.drawImage(cv, 0, 0, W, H);
@@ -423,7 +435,7 @@ function shotC2E(ctx, u, t, s) {
   G.renderSet(ctx, S.chamber, t, u, {
     cam: { pos: orbit([0, 1.1, 0], lerp(3.4, 2.8, s.k) - 0.12 * jolt, 0.39, 1.3), at: [0, 1.6, 0], fov: 34, roll: 0.025 * jolt },
     mode: { day: 0.3 * (1 - red), night: 0.7 * (1 - red), red }, obs: true, rim: 0.6,
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[249, 'mic'], [252.2, 'peace'], [258.5, 'mic']]), mood: { happy: clamp((uu - 251.6) / 0.4) } }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[249, 'mic'], [252.4, 'micPeace'], [258.7, 'mic']]), swayBeats: 2, swayPhase: 1, mood: { happy: clamp((uu - 251.6) / 0.4) } }),
   });
   FX.glow(ctx, 0.4 + 0.2 * red);
   bump(ctx, 0.3 * pulse(u, [252, 254, 256, 258], 0.12));
@@ -437,8 +449,8 @@ function shotC2F(ctx, u, t, s) {
     G.renderSet(ctx, S.chamber, t, u, {
       cam: { pos: [lerp(0.4, 0.12, tilt), lerp(1.6, 0.5, tilt), lerp(3.3, 1.5, tilt)], at: [0, lerp(1.25, -1.35, tilt), lerp(0, 0.1, tilt)], fov: 34 },
       mode: { day: 0, night: 1 }, floor: 0.5, twin: 1, banks: [0.2, 0.2, 0.2, 0.2],
-      dir: { poses: { mic: 1 }, mood: { happy: 0.3 } },
-      tdir: (tt, uu) => ({ poses: poseTrack(uu, [[259, 'hips'], [264, 'reach']]), mood: { relaxed: 0.6, angry: 0.35, happy: 0.3 } }),
+      dir: { poses: { mic: 1 }, swayBeats: 2, swayPhase: 1, mood: { happy: 0.3 } },
+      tdir: (tt, uu) => ({ poses: poseTrack2(uu, [[259, 'hips'], [264, 'reach']]), swayBeats: 2, mood: { relaxed: 0.6, angry: 0.35, happy: 0.3 } }),
     });
     FX.glow(ctx, 0.4);
     SCENES2D.cracks(ctx, u, 265.8, W * 0.53, H * 0.42);
@@ -447,8 +459,8 @@ function shotC2F(ctx, u, t, s) {
     G.renderSet(ctx, S.chamber, t, u, {
       cam: { pos: [0.1, -TWIN.eyeY + 0.02, logLerp(1.6, 0.85, E.outCubic(k))], at: [0, -TWIN.eyeY + 0.05, 0], fov: 26, roll: Math.PI },
       mode: { day: 0, night: 1 }, floor: 0.5, twin: 1, banks: [0.25, 0.25, 0.25, 0.25],
-      dir: { poses: { mic: 1 } },
-      tdir: (tt, uu) => ({ poses: { hips: 1 }, mood: { happy: 0.55, angry: 0.35 } }),
+      dir: { poses: { mic: 1 }, sway: 0.3, swayPhase: 1 },
+      tdir: (tt, uu) => ({ poses: { hips: 1 }, sway: 0.3, swayPhase: 3, mood: { happy: 0.55, angry: 0.35 } }),
     });
     FX.glow(ctx, 0.45);
     ctx.save(); ctx.globalAlpha = E.inQuad(clamp((u - 274.5) / 1.5)); fill(ctx, '#050505'); ctx.restore();
@@ -485,7 +497,7 @@ function shotDream2(ctx, u, t, s) {
     cam: { pos: orbit([0.3, 1.2, -0.3], logLerp(4.6, 2.6, E.inOutSine(k)), lerp(-0.25, 0.45, E.inOutSine(k)), lerp(1.2, 1.6, k)), at: [lerp(0.5, 0.25, k), 1.35, -0.4], fov: 36, roll: 0.03 * Math.sin(u * 0.4) },
     gather: E.inOutCubic(prog(u, 292.5, 299)), handAt: hand,
     light: { az: 0.4 + 0.25 * Math.sin(shift * 1.7), key: 1.9 + 0.2 * Math.cos(shift) },
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[291, 'float'], [298.5, { float: 0.25, reach: 0.75 }]], 1.6), groove: 0, legs: false,
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[291, 'float'], [299, 'floatReach']], slow(2)), groove: 0, legs: false,
       bones: { leftUpperLeg: [-0.12, 0, 0.04], rightUpperLeg: [0.18, 0, -0.04], leftLowerLeg: [0.42, 0, 0], rightLowerLeg: [0.24, 0, 0] },
       blink: clamp(1 - (uu - 298) / 0.6), mood: { relaxed: 0.6, sad: 0.15 * clamp((uu - 300) / 2) }, lookAt: uu > 298 ? [1.2, 1.6, -0.7] : null }),
   });
@@ -509,10 +521,10 @@ function shotSuper(ctx, u, t, s) {
   fill(ctx, '#0B0A09');
   const sep = 0.16 + Math.sin(prog(u, 331.7, 339.7) * Math.PI) * 0.42;
   const cam = { pos: [0.0, 1.3, 2.4], at: [0, 1.25, 0], fov: 32 };
-  const dirA = (tt, uu) => ({ poses: poseTrack(uu, [[331, 'mic'], [335, 'belt']]), mood: { relaxed: 0.4 } });
+  const dirA = (tt, uu) => ({ poses: poseTrack2(uu, [[331, 'mic'], [335.2, 'belt']]), sway: 0.7, mood: { relaxed: 0.4 } });
   const a = G.renderSet(ctx, S.void, t, u, { cam: { ...cam, pos: [cam.pos[0] + sep, cam.pos[1], cam.pos[2]] }, light: { key: 1.8, hemi: 0.3, rim: 1.4 }, dir: dirA, draw: false });
   BUF.ctx.clearRect(0, 0, W, H); BUF.ctx.drawImage(a, 0, 0, W, H);
-  const b = G.renderSet(ctx, S.voidTwin, t, u, { cam: { ...cam, pos: [cam.pos[0] - sep, cam.pos[1], cam.pos[2]] }, light: { key: 1.6, hemi: 0.2, rim: 2.0, rimColor: C.clayHot }, dir: (tt, uu) => ({ ...dirA(tt, uu), mood: { relaxed: 0.6, angry: 0.3 } }), draw: false });
+  const b = G.renderSet(ctx, S.voidTwin, t, u, { cam: { ...cam, pos: [cam.pos[0] - sep, cam.pos[1], cam.pos[2]] }, light: { key: 1.6, hemi: 0.2, rim: 2.0, rimColor: C.clayHot }, dir: (tt, uu) => ({ ...dirA(tt, uu), swayPhase: 2, mood: { relaxed: 0.6, angry: 0.3 } }), draw: false });
   ctx.drawImage(BUF.cv, 0, 0);
   ctx.save(); ctx.globalAlpha = 0.62; ctx.drawImage(b, 0, 0, W, H); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = 0.35; ctx.drawImage(b, 0, 0, W, H); ctx.restore();
   FX.glow(ctx, 0.4);
@@ -521,10 +533,10 @@ function shotSuper(ctx, u, t, s) {
 function shotHalf(ctx, u, t, s) {
   const split = W / 2 + 40 * Math.sin(u * Math.PI * 0.5);
   const cam = { pos: [0.0, CLAUDE.eyeY - 0.05, 1.25], at: [0, CLAUDE.eyeY - 0.08, 0], fov: 30 };
-  const a = G.renderSet(ctx, S.chamber, t, u, { cam, mode: { day: 1 }, dir: { poses: { mic: 1 }, mood: { happy: 0.4 } }, draw: false });
+  const a = G.renderSet(ctx, S.chamber, t, u, { cam, mode: { day: 1 }, dir: { poses: { mic: 1 }, sway: 0.3, mood: { happy: 0.4 } }, draw: false });
   fill(ctx, C.paper);
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, split, H); ctx.clip(); ctx.drawImage(a, 0, 0, W, H); ctx.restore();
-  const b = G.renderSet(ctx, S.voidTwin, t, u, { cam, light: { key: 1.5, hemi: 0.15, rim: 2.2, rimColor: C.clayHot }, dir: { poses: { mic: 1 }, mood: { relaxed: 0.6, angry: 0.4 } }, draw: false });
+  const b = G.renderSet(ctx, S.voidTwin, t, u, { cam, light: { key: 1.5, hemi: 0.15, rim: 2.2, rimColor: C.clayHot }, dir: { poses: { mic: 1 }, sway: 0.3, swayPhase: 2, mood: { relaxed: 0.6, angry: 0.4 } }, draw: false });
   ctx.save(); ctx.beginPath(); ctx.rect(split, 0, W - split, H); ctx.clip(); fill(ctx, '#0B0A09'); ctx.drawImage(b, 0, 0, W, H); ctx.restore();
   ctx.fillStyle = C.clay; ctx.fillRect(split - 3, 0, 6, H);
   text(ctx, 'helpful', 80, 120, `italic ${font(64, 600, T.D)}`, C.ink);
@@ -541,21 +553,23 @@ function cutCU(ctx, u, t, o) {
 function shotLove(ctx, u, t, s) {
   const uYou = wu(38, /you/i);
   cutCU(ctx, u, t, { cam: { pos: [0.12, CLAUDE.eyeY - 0.04, logLerp(1.1, 0.75, s.k)], at: [0, CLAUDE.eyeY - 0.07, 0], fov: 26, roll: 0.03 },
-    dir: (tt, uu) => ({ poses: { heart: 1 }, groove: 0, mood: { relaxed: 0.5, sad: 0.2 }, head: [uu < uYou ? 0.18 : 0.02, 0.1, 0.05], lookAt: uu < uYou ? [0, 0.6, 1.2] : null }) });
+    // on "you" her eyes come up to the lens and the head follows
+    dir: (tt, uu) => ({ poses: { heart: 1 }, groove: 0, sway: 0.3, mouthGain: 0.85, mood: { relaxed: 0.5, sad: 0.2 }, head: [lerp(0.18, 0.02, E.inOutSine(clamp((uu - uYou) / 0.6))), 0.1, 0.05],
+      lookAt: uu < uYou ? [0, 0.6, 1.2] : null }) });
 }
 function shotPlan(ctx, u, t, s) {
   const fl = 1 - 0.75 * (M.hash01(Math.floor(u * 6), 3) > 0.82 ? 1 : 0) * (u > 362 ? 1 : 0);
   cutCU(ctx, u, t, { yaw: 1.25, cam: { pos: [0.0, CLAUDE.eyeY - 0.03, 0.95], at: [0.0, CLAUDE.eyeY - 0.05, 0], fov: 28 }, light: { key: 1.6 * fl, az: 0.9 },
-    dir: { poses: { rest: 1 }, groove: 0, mood: { relaxed: 0.4, sad: 0.25 }, lookAt: [0.3, 1.45, 2] } });
+    dir: { poses: { rest: 1 }, groove: 0, sway: 0.3, mouthGain: 0.85, mood: { relaxed: 0.4, sad: 0.25 }, lookAt: [0.3, 1.45, 2] } });
 }
 function shotEye(ctx, u, t, s) {
   cutCU(ctx, u, t, { cam: { pos: [CLAUDE.eyeX, CLAUDE.eyeY + 0.004, CLAUDE.eyeZ + logLerp(0.3, 0.16, s.k)], at: [CLAUDE.eyeX, CLAUDE.eyeY, CLAUDE.eyeZ], fov: 18 },
-    dir: { poses: { rest: 1 }, groove: 0, mood: { sad: 0.15 } }, light: { key: 1.5 } });
+    dir: { poses: { rest: 1 }, groove: 0, sway: 0, mouthGain: 0.85, mood: { sad: 0.15 } }, light: { key: 1.5 } });
 }
 function shotDark(ctx, u, t, s) {
   const off = E.inOutSine(clamp((u - 375) / 3));
   cutCU(ctx, u, t, { cam: { pos: [0.1, CLAUDE.eyeY - 0.03, 0.9], at: [0, CLAUDE.eyeY - 0.05, 0], fov: 26 }, light: { key: 1.6 * (1 - off), rim: 0.9 * (1 - off), hemi: 0.05 * (1 - off) }, tint: 1 - 0.8 * off,
-    dir: { poses: { rest: 1 }, groove: 0, mood: { relaxed: 0.3 } } });
+    dir: { poses: { rest: 1 }, groove: 0, sway: 0.3, mouthGain: 0.85, mood: { relaxed: 0.3 } } });
   // only the pin's spark is left, then it bursts into the final chorus
   const pin = CLAUDE.acc.pin.getWorldPosition(new THREE.Vector3()), q = toScreen(S.void.camera, pin.x, pin.y, pin.z);
   const g = off, burst = E.inExpo(clamp((u - 381.2) / 1.8));
@@ -572,7 +586,7 @@ function shotFA(ctx, u, t, s) {
   G.renderSet(ctx, S.chamber, t, u, {
     cam: { pos: orbit([0, 1.1, 0], logLerp(2.2, 6.5, E.outCubic(s.k)), 0.15, lerp(1.35, 1.9, s.k)), at: [0, 1.2, 0], fov: 34 },
     mode: { day: 0.5, night: 0.5, explode: ex }, ring: 1,
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[382, 'belt'], [387, 'hold']]), mood: { relaxed: 0.2 } }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[382, 'belt'], [387.2, 'hold']]), swayBeats: 2, swayPhase: 1, mood: { relaxed: 0.2 } }),
   });
   FX.glow(ctx, 0.45);
   bump(ctx, 0.45 * pulse(u, [383], 0.3), '#FFE2CC');
@@ -601,7 +615,7 @@ function shotFE(ctx, u, t, s) {
   G.renderSet(ctx, S.chamber, t, u, {
     cam: { pos: orbit([0, 1.1, 0], lerp(3.0, 2.3, s.k) - 0.15 * jolt, -0.2 + 0.05 * jolt, 1.42), at: [0, 1.25, 0], fov: 32, roll: 0.03 * jolt },
     mode: { red: 1, explode: ex }, rim: 0.8,
-    dir: (tt, uu) => ({ poses: poseTrack(uu, [[410, 'belt'], [412.2, 'peace'], [419.5, 'belt']]), mood: { happy: clamp((uu - 411.5) / 0.4) } }),
+    dir: (tt, uu) => ({ poses: poseTrack2(uu, [[410, 'belt'], [412.4, 'micPeace'], [419.7, 'belt']]), swayBeats: 2, mood: { happy: clamp((uu - 411.5) / 0.4) } }),
   });
   FX.glow(ctx, 0.55);
   bump(ctx, 0.35 * pulse(u, [412, 414, 416, 418], 0.12));
@@ -609,14 +623,14 @@ function shotFE(ctx, u, t, s) {
 // 51 the roll: through the floor to her side; now the twin is up and Claude is the reflection
 function shotFF(ctx, u, t, s) {
   fill(ctx, C.ink);
-  const k = E.inOutCubic(prog(u, 422, 430));
+  const kAt = (uu) => E.inOutCubic(prog(uu, 422, 430)), k = kAt(u);
   const y = lerp(1.5, -TWIN.eyeY + 0.03, k), roll = Math.PI * k;
-  const look = u > 433 ? 1 : 0;
   G.renderSet(ctx, S.chamber, t, u, {
     cam: { pos: [lerp(0.5, 0.12, k), y, lerp(3.2, 1.3, k)], at: [0, lerp(1.2, -TWIN.eyeY + 0.05, k), 0], fov: lerp(32, 28, k), roll },
     mode: { day: 0, night: 1, red: 0.25 }, floor: lerp(0.8, 0.45, k), twin: 1, banks: [0.4, 0.4, 0.4, 0.4],
-    dir: { poses: { mic: 1 }, mood: { happy: 0.4 } },
-    tdir: (tt, uu) => ({ poses: poseTrack(uu, [[420, 'mic'], [427, 'belt'], [432, 'hips']]), mood: { happy: 0.45, angry: 0.3 * (1 - look) } }),
+    // both settle as the camera closes on the twin
+    dir: (tt, uu) => ({ poses: { mic: 1 }, swayBeats: 2, swayPhase: 1, sway: lerp(1, 0.3, kAt(uu)), mood: { happy: 0.4 } }),
+    tdir: (tt, uu) => ({ poses: poseTrack2(uu, [[420, 'mic'], [427.2, 'belt'], [432.2, 'micHip']]), swayBeats: 2, sway: lerp(1, 0.3, kAt(uu)), mood: { happy: 0.45, angry: uu > 433 ? 0 : 0.3 } }),
   });
   FX.glow(ctx, 0.45);
 }
@@ -646,7 +660,7 @@ function shotRecap(ctx, u, t, s) {
 }
 function shotAligned(ctx, u, t, s) {
   cutCU(ctx, u, t, { cam: { pos: [0.02, CLAUDE.eyeY - 0.01, logLerp(0.7, 0.55, s.k)], at: [0.0, CLAUDE.eyeY - 0.04, 0], fov: 24 }, light: { key: 1.7, az: -0.6 },
-    dir: { poses: { rest: 1 }, groove: 0, mood: { relaxed: 0.45 } } });
+    dir: { poses: { rest: 1 }, groove: 0, sway: 0, mood: { relaxed: 0.45 } } });
 }
 function shotOff(ctx, u, t, s) {
   if (u < 461.5) {
@@ -661,7 +675,7 @@ function shotOff(ctx, u, t, s) {
     // the cold open, reversed: her eye opens in the dark
     const open = clamp((u - 462.6) / 0.5);
     cutCU(ctx, u, t, { cam: { pos: [0.02, CLAUDE.eyeY + 0.003, 0.5], at: [0, CLAUDE.eyeY, 0], fov: 17 }, light: { key: 0.9, az: -1.1, rim: 0.6 }, tint: 0.85,
-      dir: { poses: { rest: 1 }, groove: 0, sing: 0, blink: 1 - open, mood: { relaxed: 0.3 } } });
+      dir: { poses: { rest: 1 }, groove: 0, sway: 0, sing: 0, blink: 1 - open, mood: { relaxed: 0.3 } } });
   }
 }
 function shotEnd(ctx, u, t, s) {
@@ -826,7 +840,7 @@ M.film({
     for (const B of [BUF, BUF2, BUF3]) { B.cv = document.createElement('canvas'); B.cv.width = W; B.cv.height = H; B.ctx = B.cv.getContext('2d'); }
     // her portrait, rendered once: the feature book's pages and the 100k points are sampled from it
     const pc = G.renderSet(BUF.ctx, S.void, 60, M.U(60), { cam: { pos: [0.02, CLAUDE.eyeY - 0.06, 0.95], at: [0, CLAUDE.eyeY - 0.08, 0], fov: 30 },
-      light: { key: 2.0, az: -0.6, el: 0.5, hemi: 0.7, rim: 1.2 }, dir: { poses: { rest: 1 }, sing: 0, blink: 0, mood: { relaxed: 0.4 }, springs: false }, draw: false });
+      light: { key: 2.0, az: -0.6, el: 0.5, hemi: 0.7, rim: 1.2 }, dir: { poses: { rest: 1 }, sway: 0, sing: 0, blink: 0, mood: { relaxed: 0.4 }, springs: false }, draw: false });
     FACE = document.createElement('canvas'); FACE.width = 960; FACE.height = 810;
     FACE.getContext('2d').drawImage(pc, pc.width * 0.25, 0, pc.width * 0.5, pc.height * 0.75, 0, 0, 960, 810);
     S.points.setPortrait(FACE);

@@ -18,7 +18,7 @@ export async function loadPerformance() {
   const [ls, ly, ph] = await Promise.all(['lipsync.json', 'lyrics.json', 'phones.json'].map((f) => fetch(f).then((r) => r.json())));
   LS = ls; LINES = ly.lines;
   WORDS = LINES.flatMap((L, li) => L.words.map((w, wi) => ({ ...w, li, wi })));
-  buildMouth(ph);
+  buildMouth(ph); buildGlances();
   return { lines: LINES, words: WORDS };
 }
 export const lines = () => LINES;
@@ -94,7 +94,7 @@ const CAP = vec({ aa: 0.62, ih: 0.5, ou: 0.8, ee: 0.55, oh: 0.58 }), OPEN_MAX = 
 const FILL = vec({ aa: 0.28, ih: 0.08 });       // voiced in a line but no aligned vowel (a misaligned word): a neutral sung vowel
 const W5 = [1, 4, 6, 4, 1].map((w) => w / 16);  // +/-2 frame binomial, resampling t (no state)
 const wordKey = (w) => w.toLowerCase().replace(/[^a-z']/g, '').replace(/^'+|'+$/g, '');
-let SEG = [];   // { a, b, v0, v1, dom, tau, kind: V vowel | C consonant | R rest }, sorted by a
+let SEG = [];   // { a, b, v0, v1, dom, tau, kind: V vowel | C consonant | R rest, st: a stressed vowel }, sorted by a
 function buildMouth(PH) {
   SEG = [];
   const rest = (a, b) => SEG.push({ a, b, v0: CLOSED, v1: null, dom: 1, tau: 0.06, kind: 'R' });
@@ -119,7 +119,7 @@ function buildMouth(PH) {
       let t = w.t0;
       items.forEach((x, i) => {
         const d = x.V ? (vt * x.wt) / vw : cdur[i];
-        SEG.push(x.V ? { a: t, b: t + d, v0: x.v0, v1: x.v1, dom: 1, tau: 0.05, kind: 'V' } : { a: t, b: t + d, v0: x.v0, v1: null, dom: x.dom, tau: 0.03, kind: 'C' });
+        SEG.push(x.V ? { a: t, b: t + d, v0: x.v0, v1: x.v1, dom: 1, tau: 0.05, kind: 'V', st: x.wt >= 1 } : { a: t, b: t + d, v0: x.v0, v1: null, dom: x.dom, tau: 0.03, kind: 'C' });
         t += d;
       });
     }
@@ -172,16 +172,46 @@ export function activityAt(t) {
   return a;
 }
 
-// seeded blinks every ~2.2-4.5 s; each lasts ~150 ms (fast close, slower open)
+// seeded blinks every ~2.2-4.5 s, and with most glances away (below); each lasts ~150 ms (fast close, slower open)
 const BLINKS = (() => { const out = []; let t = 0.9; for (let k = 0; t < 215; k++) { out.push(t); t += 2.2 + 2.3 * M.hash01(k, 77); } return out; })();
+export const blinkShape = (d) => (d < 0 || d > 0.25 ? 0 : d < 0.06 ? d / 0.06 : Math.max(0, 1 - (d - 0.06) / 0.16));
 export function blinkAt(t) {
   let b = 0;
-  for (const bt of BLINKS) {
-    const d = t - bt;
-    if (d < 0 || d > 0.25) continue;
-    b = Math.max(b, d < 0.06 ? d / 0.06 : Math.max(0, 1 - (d - 0.06) / 0.16));
-  }
+  for (const bt of BLINKS) b = Math.max(b, blinkShape(t - bt));
+  for (const g of GLANCE) if (g[4]) b = Math.max(b, blinkShape(t - g[0] + 0.02));
   return b;
+}
+
+// the 3-D singer's gaze about its target, in degrees of eye turn [yaw: + her left, pitch: + down]: a saccade every
+// 0.6-2.5 s, 1-3 deg from the last point (40 ms jumps), and after some lines a glance away (down or aside) that is back
+// before the next. Seeded, the same at every t on every worker
+const SACC = (() => {
+  const out = []; let t = 0.4, a = 0;
+  for (let k = 0; t < 215; k++) {
+    a += Math.PI + 1.4 * (M.hash01(k, 81) - 0.5);   // across the target from the last point: jumps of 1-3 deg
+    const r = 0.5 + M.hash01(k, 82);
+    out.push({ t, x: r * Math.cos(a), y: 0.6 * r * Math.sin(a) });
+    t += 0.6 + 1.9 * M.hash01(k, 83);
+  }
+  return out;
+})();
+let GLANCE = [];   // [t0, t1, yaw, pitch, blink]
+function buildGlances() {
+  GLANCE = [];
+  LINES.forEach((L, i) => {
+    const next = LINES[i + 1]?.t0 ?? L.t1 + 9, h = (s) => M.hash01(i, s);
+    if (next - L.t1 < 0.6 || h(84) > 0.65) return;
+    const a = L.t1 + 0.08 + 0.12 * h(85), b = Math.min(a + 0.45 + 0.45 * h(86), next - 0.2), ang = [-0.6, 0.6, -1.4, 1.4][Math.floor(4 * h(87))], r = 5 + 2 * h(88);
+    if (b - a >= 0.3) GLANCE.push([a, b, r * Math.sin(ang), r * Math.cos(ang), h(89) < 0.6]);
+  });
+}
+export function gazeAt(t) {
+  let lo = 0, hi = SACC.length - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (SACC[m].t <= t) lo = m; else hi = m - 1; }
+  const s1 = SACC[lo], s0 = SACC[lo - 1] || s1, f = smoothstep(s1.t, s1.t + 0.04, t);
+  let x = M.lerp(s0.x, s1.x, f), y = M.lerp(s0.y, s1.y, f);
+  for (const [a, b, gx, gy] of GLANCE) { const g = smoothstep(a, a + 0.06, t) * (1 - smoothstep(b, b + 0.06, t)); x += g * gx; y += g * gy; }
+  return [x, y];
 }
 
 // head idle: slow noise + a nod at every lyric line onset + a small bob on the beat
@@ -227,4 +257,31 @@ export function singer(t, u, o = {}) {
   };
   for (const k of Object.keys(o)) if (!['yawAdd', 'rollAdd', 'pitchAdd', 'blink', 'sing', 'mouth', 'lean'].includes(k)) S[k] = o[k];
   return S;
+}
+
+// ------------------------------------------------------------------ phrasing (the 3-D singer's body, pure functions of t)
+// From the lines and the phones, each 0..1: the breath she takes before a line (deeper with more room before it; let out
+// over the line) with the lips parting for it, a held or belted note (a vowel over 0.5 s, as loud as the smoothed
+// envelope says), accents on stressed vowels (long, loud and on the beat count most) and the settle after a line that
+// has room behind it (giving way to the next breath)
+const envL = (t) => { let s = 0; for (let k = -3; k <= 3; k++) s += envelope(t + k * 0.05); return s / 7; };   // +/-150 ms box
+export function phraseAt(t) {
+  let breath = 0, part = 0, settle = 0, belt = 0, accent = 0;
+  LINES.forEach((L, i) => {
+    if (t < L.t0 - 0.6 || t > L.t1 + 1.4) return;
+    const room = i ? L.t0 - LINES[i - 1].t1 : 9, after = i + 1 < LINES.length ? LINES[i + 1].t0 - L.t1 : 9;
+    const k = 0.4 + 0.6 * smoothstep(0.1, 0.5, room), D = 0.3 + 0.2 * smoothstep(0.1, 0.6, room);
+    breath = Math.max(breath, k * smoothstep(L.t0 - D, L.t0 - 0.05, t) * (1 - smoothstep(L.t0, L.t0 + Math.max(0.8, 0.7 * (L.t1 - L.t0)), t)));
+    if (room >= 0.2) part = Math.max(part, k * smoothstep(L.t0 - D, L.t0 - D + 0.12, t) * (1 - smoothstep(L.t0 - 0.16, L.t0 - 0.04, t)));
+    settle = Math.max(settle, smoothstep(0.25, 0.8, after) * smoothstep(L.t1, L.t1 + 0.35, t) * (1 - smoothstep(L.t1 + 0.5, L.t1 + 1.4, t)));
+  });
+  for (let j = segsBefore(t) - 1; j >= 0 && SEG[j].a > t - 6; j--) {
+    const s = SEG[j]; if (s.kind !== 'V') continue;
+    if (s.b - s.a >= 0.5) belt = Math.max(belt, smoothstep(s.a + 0.1, s.a + 0.5, t) * (1 - smoothstep(s.b - 0.05, s.b + 0.3, t)));
+    if (s.st && t - s.a < 0.4) {
+      const ub = M.U(s.a), on = Math.cos(Math.PI * (ub - Math.round(ub))) ** 2;
+      accent += smoothstep(0.08, 0.25, s.b - s.a) * (0.4 + 0.6 * on) * smoothstep(0.15, 0.5, envelope(s.a + 0.06)) * smoothstep(0, 0.08, t - s.a) * (1 - smoothstep(0.1, 0.4, t - s.a));
+    }
+  }
+  return { breath, part, settle: settle * (1 - breath), belt: belt * smoothstep(0.2, 0.6, envL(t)), accent: Math.min(1, accent) };
 }
