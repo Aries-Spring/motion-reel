@@ -6,9 +6,9 @@
   each change of pixel format made ffmpeg rebuild its filter graph, emptying the `tile` filter. A sheet
   then held only the frames after the last switch: on a 9x16 film `contact_9x16_p1.png` and `_p2.png`
   were byte-identical, page 1 started around beat 57, and the `phone_*` pages and the all-beats
-  `contact*.png` were wrong the same way. Tiling
-  now runs with `-reinit_filter 0`, so pages start at beats 0, 36, 72, ... whatever the frames' format
-  (`--strip` uses the same helper). Output from uniform frames is unchanged.
+  `contact*.png` were wrong the same way. Tiling now runs with `-reinit_filter 0`, so pages start at
+  beats 0, 36, 72, ... whatever the frames' format (`--strip` uses the same helper). Output from
+  uniform frames is unchanged.
 
 ## 1.3.0 - 2026-10-14
 
