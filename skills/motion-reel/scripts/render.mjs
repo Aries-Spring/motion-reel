@@ -171,9 +171,13 @@ function encoder(out, audio = null) {
 }
 
 // Tile a numbered PNG sequence into one sheet; thumbnails keep the format's aspect.
+// Chromium's screenshots are not all the same pixel format (most rgb24, the odd one rgba). By default
+// ffmpeg rebuilds the filter graph when the input format changes, which empties the tile filter, so a
+// page came out holding only the frames after the last switch (pages 1 and 2 identical, page 1 starting
+// at beat ~57). -reinit_filter 0 keeps one graph; scale converts each frame as it arrives.
 function tile(pattern, start, count, cols, thumbH, file) {
   const th = thumbH, tw = Math.round((th * W) / H / 2) * 2;
-  ffmpeg(['-framerate', '1', '-start_number', String(start), '-i', pattern, '-frames:v', '1',
+  ffmpeg(['-framerate', '1', '-reinit_filter', '0', '-start_number', String(start), '-i', pattern, '-frames:v', '1',
     '-vf', `scale=${tw}:${th}:flags=area,pad=${tw + 8}:${th + 8}:4:4:0x777777,tile=${cols}x${Math.ceil(count / cols)}`, file]);
 }
 
