@@ -1,0 +1,495 @@
+[
+ {
+  "beat": 0,
+  "t": 0,
+  "label": "knock 1",
+  "opts": {
+   "el": "knock",
+   "slice": 0,
+   "gain": 1
+  }
+ },
+ {
+  "beat": 1,
+  "t": 0.75,
+  "label": "knock 2",
+  "opts": {
+   "el": "knock",
+   "slice": 1,
+   "gain": 1
+  }
+ },
+ {
+  "beat": 2,
+  "t": 1.5,
+  "label": "knock 3",
+  "opts": {
+   "el": "knock",
+   "slice": 2,
+   "gain": 1.15
+  }
+ },
+ {
+  "beat": 4,
+  "t": 3,
+  "label": "1817 stamps",
+  "sfx": "sub",
+  "opts": {
+   "len": 1.4,
+   "gain": 0.5
+  }
+ },
+ {
+  "beat": 5,
+  "t": 3.75,
+  "label": "caption types on",
+  "sfx": "type",
+  "opts": {
+   "len": 1.3,
+   "gain": 0.25
+  }
+ },
+ {
+  "beat": 8,
+  "t": 6,
+  "label": "match cut into the corn",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.8,
+   "from": 300,
+   "to": 1400,
+   "gain": 0.12
+  }
+ },
+ {
+  "beat": 9.5,
+  "t": 7.125,
+  "label": "JOHN BELL",
+  "sfx": "thud+click",
+  "opts": {
+   "gain": 0.35
+  }
+ },
+ {
+  "beat": 13,
+  "t": 9.75,
+  "label": "cut: toward us",
+  "sfx": "thud+click",
+  "opts": {
+   "gain": 0.45
+  }
+ },
+ {
+  "beat": 18,
+  "t": 13.5,
+  "label": "the creature",
+  "sfx": "sub",
+  "opts": {
+   "len": 1,
+   "gain": 0.45
+  }
+ },
+ {
+  "beat": 21,
+  "t": 15.75,
+  "label": "hammer cocks",
+  "sfx": "click+tick",
+  "opts": {
+   "gain": 0.4
+  }
+ },
+ {
+  "beat": 22.5,
+  "t": 16.875,
+  "label": "the shot",
+  "sfx": "sub",
+  "opts": {
+   "el": "rifle",
+   "gain": 0.5,
+   "elGain": 1,
+   "len": 0.8
+  }
+ },
+ {
+  "beat": 26,
+  "t": 19.5,
+  "label": "cut to night",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.9,
+   "from": 2000,
+   "to": 200,
+   "gain": 0.08
+  }
+ },
+ {
+  "beat": 30.5,
+  "t": 22.875,
+  "label": "door knock",
+  "opts": {
+   "el": "knock",
+   "slice": 3,
+   "gain": 1
+  }
+ },
+ {
+  "beat": 31,
+  "t": 23.25,
+  "label": "KNOCKING",
+  "opts": {
+   "el": "knock",
+   "slice": 4,
+   "gain": 1.15
+  }
+ },
+ {
+  "beat": 31.5,
+  "t": 23.625,
+  "label": "knock",
+  "opts": {
+   "el": "knock",
+   "slice": 5,
+   "gain": 0.9
+  }
+ },
+ {
+  "beat": 32,
+  "t": 24,
+  "label": "knock",
+  "opts": {
+   "el": "knock",
+   "slice": 0,
+   "gain": 1
+  }
+ },
+ {
+  "beat": 32.5,
+  "t": 24.375,
+  "label": "knock",
+  "opts": {
+   "el": "knock",
+   "slice": 2,
+   "gain": 0.85
+  }
+ },
+ {
+  "beat": 33,
+  "t": 24.75,
+  "label": "SCRATCHING",
+  "opts": {
+   "el": "scratch",
+   "gain": 1
+  }
+ },
+ {
+  "beat": 35,
+  "t": 26.25,
+  "label": "GNAWING",
+  "opts": {
+   "el": "gnaw",
+   "gain": 1.1
+  }
+ },
+ {
+  "beat": 37,
+  "t": 27.75,
+  "label": "CHAINS",
+  "opts": {
+   "el": "chains",
+   "gain": 1
+  }
+ },
+ {
+  "beat": 39,
+  "t": 29.25,
+  "label": "all at once",
+  "opts": {
+   "el": "dog",
+   "gain": 0.45
+  }
+ },
+ {
+  "beat": 39.5,
+  "t": 29.625,
+  "label": "cut",
+  "opts": {
+   "el": "knock",
+   "slice": 1,
+   "gain": 0.6
+  }
+ },
+ {
+  "beat": 40,
+  "t": 30,
+  "label": "cut",
+  "opts": {
+   "el": "knock",
+   "slice": 4,
+   "gain": 0.7
+  }
+ },
+ {
+  "beat": 40.5,
+  "t": 30.375,
+  "label": "cut",
+  "opts": {
+   "el": "knock",
+   "slice": 3,
+   "gain": 0.8
+  }
+ },
+ {
+  "beat": 41.5,
+  "t": 31.125,
+  "label": "the quilt slides",
+  "sfx": "thud",
+  "opts": {
+   "el": "quilt",
+   "gain": 0.2,
+   "elGain": 0.9,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 45.5,
+  "t": 34.125,
+  "label": "Goodspeed types on",
+  "sfx": "type",
+  "opts": {
+   "len": 2.4,
+   "gain": 0.2
+  }
+ },
+ {
+  "beat": 45.75,
+  "t": 34.3125,
+  "label": "slapped / candle out",
+  "sfx": "thud",
+  "opts": {
+   "el": "slap",
+   "gain": 0.15,
+   "elGain": 0.9
+  }
+ },
+ {
+  "beat": 53,
+  "t": 39.75,
+  "label": "the voice",
+  "sfx": "sub",
+  "opts": {
+   "len": 1.6,
+   "gain": 0.35
+  }
+ },
+ {
+  "beat": 63,
+  "t": 47.25,
+  "label": "KATE",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.3
+  }
+ },
+ {
+  "beat": 66,
+  "t": 49.5,
+  "label": "two shadows",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 1.2,
+   "from": 200,
+   "to": 900,
+   "gain": 0.07
+  }
+ },
+ {
+  "beat": 70.5,
+  "t": 52.875,
+  "label": "DEC. 19 1820",
+  "sfx": "type",
+  "opts": {
+   "len": 0.8,
+   "gain": 0.22
+  }
+ },
+ {
+  "beat": 72,
+  "t": 54,
+  "label": "cupboard opens",
+  "opts": {
+   "el": "creak",
+   "gain": 0.8
+  }
+ },
+ {
+  "beat": 80.75,
+  "t": 60.5625,
+  "label": "the cat",
+  "opts": {
+   "el": "cat",
+   "gain": 0.75,
+   "cut": 1.1
+  }
+ },
+ {
+  "beat": 85.5,
+  "t": 64.125,
+  "label": "vial shatters",
+  "opts": {
+   "el": "vial",
+   "gain": 1,
+   "cut": 0.45
+  }
+ },
+ {
+  "beat": 86,
+  "t": 64.5,
+  "label": "BLUE",
+  "sfx": "impact+thud",
+  "opts": {
+   "gain": 0.75
+  }
+ },
+ {
+  "beat": 87.5,
+  "t": 65.625,
+  "label": "the chimney",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.7,
+   "from": 400,
+   "to": 3000,
+   "gain": 0.12
+  }
+ },
+ {
+  "beat": 89.5,
+  "t": 67.125,
+  "label": "the bell / DEC. 20 1820",
+  "opts": {
+   "el": "bell",
+   "gain": 0.7,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 95,
+  "t": 71.25,
+  "label": "dirt on the coffin",
+  "opts": {
+   "el": "dirt",
+   "gain": 0.75,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 101,
+  "t": 75.75,
+  "label": "heads snap round",
+  "sfx": "thud+sub",
+  "opts": {
+   "len": 0.9,
+   "gain": 0.5
+  }
+ },
+ {
+  "beat": 110,
+  "t": 82.5,
+  "label": "1821",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.35
+  }
+ },
+ {
+  "beat": 118.5,
+  "t": 88.875,
+  "label": "1828",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.35
+  }
+ },
+ {
+  "beat": 114.5,
+  "t": 85.875,
+  "label": "the years roll",
+  "sfx": "tick",
+  "opts": {
+   "gain": 0.25
+  }
+ },
+ {
+  "beat": 127.5,
+  "t": 95.625,
+  "label": "1935",
+  "sfx": "impact",
+  "opts": {
+   "gain": 0.4
+  }
+ },
+ {
+  "beat": 129,
+  "t": 96.75,
+  "label": "the dark cabin",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.3
+  }
+ },
+ {
+  "beat": 137,
+  "t": 102.75,
+  "label": "SCARE",
+  "sfx": "impact",
+  "opts": {
+   "el": "scream",
+   "gain": 0.6,
+   "elGain": 1.25,
+   "cut": 0.62
+  }
+ },
+ {
+  "beat": 138,
+  "t": 103.5,
+  "label": "THE BELL WITCH",
+  "sfx": "thud+sub",
+  "opts": {
+   "len": 2.4,
+   "gain": 0.6,
+   "el": "knock",
+   "slice": 2,
+   "elGain": 1.2
+  }
+ },
+ {
+  "beat": 141,
+  "t": 105.75,
+  "label": "knock",
+  "opts": {
+   "el": "knock",
+   "slice": 0,
+   "gain": 1
+  }
+ },
+ {
+  "beat": 141.75,
+  "t": 106.3125,
+  "label": "knock",
+  "opts": {
+   "el": "knock",
+   "slice": 1,
+   "gain": 1
+  }
+ },
+ {
+  "beat": 142.5,
+  "t": 106.875,
+  "label": "knock",
+  "opts": {
+   "el": "knock",
+   "slice": 2,
+   "gain": 1.15
+  }
+ }
+]

@@ -2,3 +2,10 @@
 __pycache__/
 *.pyc
 node_modules/
+# film renders: videos and frame dumps stay local (too big for git); sheets + posters are committed
+out/**/*.mp4
+out/**/stills/
+out/**/contact/
+out/**/contact_*/
+out/**/frames*/
+out/**/review*.png
