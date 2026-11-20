@@ -1,0 +1,9 @@
+{
+ "key": "8624ab0cec",
+ "body": {
+  "text": "Old vinyl record crackle and hiss, steady, no music",
+  "prompt_influence": 0.4,
+  "output_format": "mp3_44100_128",
+  "duration_seconds": 8.0
+ }
+}

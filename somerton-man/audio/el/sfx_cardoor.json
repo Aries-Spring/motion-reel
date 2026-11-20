@@ -1,0 +1,9 @@
+{
+ "key": "3980fef9c2",
+ "body": {
+  "text": "A heavy 1940s car door creaking open at night, metal latch",
+  "prompt_influence": 0.6,
+  "output_format": "mp3_44100_128",
+  "duration_seconds": 2.0
+ }
+}

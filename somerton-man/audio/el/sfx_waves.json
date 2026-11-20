@@ -1,0 +1,9 @@
+{
+ "key": "af8f3e07e3",
+ "body": {
+  "text": "Gentle ocean waves breaking on a sandy beach at dawn, a few distant seagulls, no music",
+  "prompt_influence": 0.4,
+  "output_format": "mp3_44100_128",
+  "duration_seconds": 12.0
+ }
+}
