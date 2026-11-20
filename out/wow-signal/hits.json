@@ -1,0 +1,299 @@
+[
+ {
+  "beat": 0,
+  "t": 0,
+  "label": "the printout",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.35
+  }
+ },
+ {
+  "beat": 4.75,
+  "t": 2.85,
+  "label": "cut to Earth",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.5,
+   "from": 600,
+   "to": 3000,
+   "gain": 0.12
+  }
+ },
+ {
+  "beat": 7,
+  "t": 4.2,
+  "label": "AUGUST 15, 1977",
+  "sfx": "thud+click",
+  "opts": {
+   "gain": 0.4
+  }
+ },
+ {
+  "beat": 10.25,
+  "t": 6.15,
+  "label": "low over the dish",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.7,
+   "from": 300,
+   "to": 1800,
+   "gain": 0.1
+  }
+ },
+ {
+  "beat": 11.25,
+  "t": 6.75,
+  "label": "BIG EAR",
+  "sfx": "click",
+  "opts": {
+   "gain": 0.3
+  }
+ },
+ {
+  "beat": 15.75,
+  "t": 9.45,
+  "label": "the room / 11:16 PM",
+  "sfx": "thud",
+  "opts": {
+   "el": "computer",
+   "gain": 0.3,
+   "elGain": 0.35,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 18.5,
+  "t": 11.1,
+  "label": "the CRT",
+  "sfx": "click",
+  "opts": {
+   "el": "crt",
+   "gain": 0.35,
+   "elGain": 0.8
+  }
+ },
+ {
+  "beat": 19.171666666666667,
+  "t": 11.503,
+  "label": "the spike",
+  "sfx": "sub",
+  "opts": {
+   "len": 0.8,
+   "gain": 0.4
+  }
+ },
+ {
+  "beat": 20.75,
+  "t": 12.45,
+  "label": "the printer",
+  "sfx": "click",
+  "opts": {
+   "el": "printer",
+   "gain": 0.3,
+   "elGain": 0.7,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 26,
+  "t": 15.6,
+  "label": "6"
+ },
+ {
+  "beat": 27,
+  "t": 16.2,
+  "label": "E"
+ },
+ {
+  "beat": 28,
+  "t": 16.8,
+  "label": "Q"
+ },
+ {
+  "beat": 29,
+  "t": 17.4,
+  "label": "U"
+ },
+ {
+  "beat": 30,
+  "t": 18,
+  "label": "J"
+ },
+ {
+  "beat": 31,
+  "t": 18.6,
+  "label": "5"
+ },
+ {
+  "beat": 33,
+  "t": 19.8,
+  "label": "72 seconds",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.6,
+   "from": 3000,
+   "to": 400,
+   "gain": 0.1
+  }
+ },
+ {
+  "beat": 38.74666666666667,
+  "t": 23.248,
+  "label": "the timer lands: 1:12",
+  "sfx": "click+tick",
+  "opts": {
+   "gain": 0.35
+  }
+ },
+ {
+  "beat": 43.5,
+  "t": 26.1,
+  "label": "1420 MHz",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.35
+  }
+ },
+ {
+  "beat": 50.5,
+  "t": 30.3,
+  "label": "the desk",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.6,
+   "from": 2500,
+   "to": 500,
+   "gain": 0.08
+  }
+ },
+ {
+  "beat": 56.03000000000001,
+  "t": 33.618,
+  "label": "the red circle",
+  "sfx": "tick",
+  "opts": {
+   "el": "circle",
+   "gain": 0.3,
+   "elGain": 0.9,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 61,
+  "t": 36.6,
+  "label": "WOW!",
+  "opts": {
+   "el": "scribble",
+   "gain": 0.9,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 63.5,
+  "t": 38.1,
+  "label": "the array",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.8,
+   "from": 400,
+   "to": 2400,
+   "gain": 0.1
+  }
+ },
+ {
+  "beat": 68.5,
+  "t": 41.1,
+  "label": "never came back",
+  "sfx": "sub",
+  "opts": {
+   "len": 1,
+   "gain": 0.25
+  }
+ },
+ {
+  "beat": 71.5,
+  "t": 42.9,
+  "label": "Big Ear again",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.8,
+   "from": 2000,
+   "to": 300,
+   "gain": 0.08
+  }
+ },
+ {
+  "beat": 74.605,
+  "t": 44.763,
+  "label": "the collapse",
+  "opts": {
+   "el": "collapse",
+   "gain": 0.85
+  }
+ },
+ {
+  "beat": 75.77166666666668,
+  "t": 45.463,
+  "label": "1998",
+  "sfx": "thud+click",
+  "opts": {
+   "gain": 0.5
+  }
+ },
+ {
+  "beat": 78,
+  "t": 46.8,
+  "label": "the golf course",
+  "opts": {
+   "el": "golfhit",
+   "gain": 0.9
+  }
+ },
+ {
+  "beat": 79.5,
+  "t": 47.7,
+  "label": "polite applause",
+  "opts": {
+   "el": "applause",
+   "gain": 0.6,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 82,
+  "t": 49.2,
+  "label": "2024",
+  "sfx": "thud+click",
+  "opts": {
+   "gain": 0.35
+  }
+ },
+ {
+  "beat": 87.48833333333334,
+  "t": 52.493,
+  "label": "the flash",
+  "opts": {
+   "el": "flash",
+   "gain": 0.8
+  }
+ },
+ {
+  "beat": 91.5,
+  "t": 54.9,
+  "label": "UNPROVEN",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.4
+  }
+ },
+ {
+  "beat": 94,
+  "t": 56.4,
+  "label": "back to the paper",
+  "opts": {
+   "el": "tear",
+   "gain": 0.5
+  }
+ }
+]
