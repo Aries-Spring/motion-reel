@@ -1,0 +1,9 @@
+{
+ "key": "788ee9cfdb",
+ "body": {
+  "text": "Shortwave radio static with faint warbling whistles and hiss, eerie, steady",
+  "prompt_influence": 0.5,
+  "output_format": "mp3_44100_128",
+  "duration_seconds": 8.0
+ }
+}

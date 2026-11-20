@@ -1,0 +1,9 @@
+{
+ "key": "57a83e8377",
+ "body": {
+  "text": "Summer night in an open Ohio field: crickets, soft wind, distant hum of machinery, no music",
+  "prompt_influence": 0.4,
+  "output_format": "mp3_44100_128",
+  "duration_seconds": 12.0
+ }
+}
