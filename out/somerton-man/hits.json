@@ -1,0 +1,312 @@
+[
+ {
+  "beat": 0,
+  "t": 0,
+  "label": "Tamám Shud",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.3
+  }
+ },
+ {
+  "beat": 3,
+  "t": 1.8,
+  "label": "the pocket",
+  "sfx": "click",
+  "opts": {
+   "el": "unroll",
+   "gain": 0.3,
+   "elGain": 0.7,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 8.75,
+  "t": 5.25,
+  "label": "the beach",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.7,
+   "from": 2500,
+   "to": 400,
+   "gain": 0.08
+  }
+ },
+ {
+  "beat": 10.5,
+  "t": 6.3,
+  "label": "1 DECEMBER 1948",
+  "sfx": "thud+click",
+  "opts": {
+   "gain": 0.4
+  }
+ },
+ {
+  "beat": 17.546666666666667,
+  "t": 10.528,
+  "label": "labels removed",
+  "sfx": "thud",
+  "opts": {
+   "el": "stamp",
+   "gain": 0.3,
+   "elGain": 0.8
+  }
+ },
+ {
+  "beat": 21.5,
+  "t": 12.9,
+  "label": "NO WALLET",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.45
+  }
+ },
+ {
+  "beat": 23,
+  "t": 13.8,
+  "label": "NO NAME",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.45
+  }
+ },
+ {
+  "beat": 24.5,
+  "t": 14.7,
+  "label": "cause of death",
+  "sfx": "click",
+  "opts": {
+   "gain": 0.3
+  }
+ },
+ {
+  "beat": 26.25,
+  "t": 15.75,
+  "label": "UNKNOWN stamp",
+  "opts": {
+   "el": "stamp",
+   "gain": 1
+  }
+ },
+ {
+  "beat": 28,
+  "t": 16.8,
+  "label": "the scrap unrolls",
+  "sfx": "click",
+  "opts": {
+   "el": "unroll",
+   "gain": 0.3,
+   "elGain": 0.8,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 31,
+  "t": 18.6,
+  "label": "the last page",
+  "sfx": "click",
+  "opts": {
+   "el": "pages",
+   "gain": 0.3,
+   "elGain": 0.6,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 33,
+  "t": 19.8,
+  "label": "the scrap fits",
+  "sfx": "tick+click",
+  "opts": {
+   "gain": 0.4
+  }
+ },
+ {
+  "beat": 36.84666666666667,
+  "t": 22.108,
+  "label": "IT IS FINISHED",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.4
+  }
+ },
+ {
+  "beat": 39,
+  "t": 23.4,
+  "label": "Jetty Road, night",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.8,
+   "from": 300,
+   "to": 1800,
+   "gain": 0.08
+  }
+ },
+ {
+  "beat": 40.75,
+  "t": 24.45,
+  "label": "the car",
+  "sfx": "thud",
+  "opts": {
+   "el": "cardoor",
+   "gain": 0.3,
+   "elGain": 0.6,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 45.5,
+  "t": 27.3,
+  "label": "the back cover",
+  "sfx": "click",
+  "opts": {
+   "el": "pages",
+   "gain": 0.3,
+   "elGain": 0.4,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 50.663333333333334,
+  "t": 30.398,
+  "label": "the code",
+  "sfx": "sub",
+  "opts": {
+   "el": "pencil",
+   "gain": 0.35,
+   "elGain": 0.7,
+   "align": "first",
+   "len": 1
+  }
+ },
+ {
+  "beat": 55.655,
+  "t": 33.393,
+  "label": "UNSOLVED",
+  "opts": {
+   "el": "stamp",
+   "gain": 1
+  }
+ },
+ {
+  "beat": 57.5,
+  "t": 34.5,
+  "label": "the phone",
+  "sfx": "click",
+  "opts": {
+   "el": "rotary",
+   "gain": 0.3,
+   "elGain": 0.6,
+   "align": "first"
+  }
+ },
+ {
+  "beat": 60.5,
+  "t": 36.3,
+  "label": "her street",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 0.6,
+   "from": 2000,
+   "to": 500,
+   "gain": 0.07
+  }
+ },
+ {
+  "beat": 63,
+  "t": 37.8,
+  "label": "the bust",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.25
+  }
+ },
+ {
+  "beat": 64.93833333333333,
+  "t": 38.963,
+  "label": "the flashbulb",
+  "opts": {
+   "el": "flash",
+   "gain": 0.8
+  }
+ },
+ {
+  "beat": 67.77166666666666,
+  "t": 40.663,
+  "label": "ready to faint",
+  "opts": {
+   "el": "heart",
+   "gain": 0.8
+  }
+ },
+ {
+  "beat": 72.5,
+  "t": 43.5,
+  "label": "seventy years",
+  "sfx": "whoosh",
+  "opts": {
+   "len": 1,
+   "from": 400,
+   "to": 3000,
+   "gain": 0.08
+  }
+ },
+ {
+  "beat": 77,
+  "t": 46.2,
+  "label": "the hair",
+  "sfx": "click",
+  "opts": {
+   "gain": 0.3
+  }
+ },
+ {
+  "beat": 80.5,
+  "t": 48.3,
+  "label": "the lab",
+  "sfx": "blip",
+  "opts": {
+   "el": "lab",
+   "gain": 0.25,
+   "elGain": 0.5,
+   "align": "first",
+   "pitch": "A6"
+  }
+ },
+ {
+  "beat": 85.105,
+  "t": 51.063,
+  "label": "CARL WEBB",
+  "sfx": "impact",
+  "opts": {
+   "gain": 0.45
+  }
+ },
+ {
+  "beat": 90.96333333333334,
+  "t": 54.578,
+  "label": "how he died ?",
+  "sfx": "tick",
+  "opts": {
+   "gain": 0.3
+  }
+ },
+ {
+  "beat": 93.03,
+  "t": 55.818,
+  "label": "what the code says ?",
+  "sfx": "tick",
+  "opts": {
+   "gain": 0.3
+  }
+ },
+ {
+  "beat": 97.36333333333333,
+  "t": 58.418,
+  "label": "two words",
+  "sfx": "thud",
+  "opts": {
+   "gain": 0.3
+  }
+ }
+]

@@ -9,3 +9,7 @@ out/**/contact/
 out/**/contact_*/
 out/**/frames*/
 out/**/review*.png
+
+# the skill's ffmpeg-tiled pages repeat when screenshots mix RGB/RGBA (see suggested fix); review used sheet_p*.png
+out/somerton-man/contact_9x16*.png
+out/somerton-man/phone_9x16*.png
