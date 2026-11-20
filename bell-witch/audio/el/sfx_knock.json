@@ -1,0 +1,9 @@
+{
+ "key": "b81b675215",
+ "body": {
+  "text": "Three slow, heavy knocks on the thick log wall of an old wooden cabin at night, close and dry, with a short dark room reverb",
+  "prompt_influence": 0.6,
+  "output_format": "mp3_44100_192",
+  "duration_seconds": 3.5
+ }
+}

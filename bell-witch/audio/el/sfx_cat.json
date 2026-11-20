@@ -1,0 +1,9 @@
+{
+ "key": "a795709e95",
+ "body": {
+  "text": "A cat yowls in pain and hisses, then falls silent",
+  "prompt_influence": 0.5,
+  "output_format": "mp3_44100_128",
+  "duration_seconds": 3.0
+ }
+}

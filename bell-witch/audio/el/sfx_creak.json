@@ -1,0 +1,9 @@
+{
+ "key": "f50dfcb825",
+ "body": {
+  "text": "Old wooden floorboards creaking under slow footsteps in an empty cabin",
+  "prompt_influence": 0.6,
+  "output_format": "mp3_44100_128",
+  "duration_seconds": 4.0
+ }
+}

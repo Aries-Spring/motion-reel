@@ -1,0 +1,9 @@
+{
+ "key": "00d3eb83ce",
+ "body": {
+  "text": "Slow heavy heartbeat, deep and muffled, horror",
+  "prompt_influence": 0.6,
+  "output_format": "mp3_44100_128",
+  "duration_seconds": 8.0
+ }
+}

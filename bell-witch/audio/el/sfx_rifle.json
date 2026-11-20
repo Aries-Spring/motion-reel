@@ -1,0 +1,9 @@
+{
+ "key": "da4bb6e411",
+ "body": {
+  "text": "A single old flintlock musket shot fired across an open cornfield at dusk, sharp crack with a long rolling echo",
+  "prompt_influence": 0.6,
+  "output_format": "mp3_44100_128",
+  "duration_seconds": 3.5
+ }
+}

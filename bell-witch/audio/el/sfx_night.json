@@ -1,0 +1,9 @@
+{
+ "key": "e0aaaec369",
+ "body": {
+  "text": "Night ambience on a rural farm in 1800s Tennessee: crickets, distant owl, wind moving through dry corn stalks, no music",
+  "prompt_influence": 0.4,
+  "output_format": "mp3_44100_128",
+  "duration_seconds": 20.0
+ }
+}
